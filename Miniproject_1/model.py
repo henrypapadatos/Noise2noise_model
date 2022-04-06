@@ -2,11 +2,14 @@ import torch
 from torch import nn
 import matplotlib.pyplot as plt
 
-class Model():
+class Model(nn.Module):
     def __init__(self):
         ## instantiate model + optimizer + loss function + any other stuff you need
 
+        super().__init__()
         self.lr = 0.001
+        self.nb_epoch = 100
+        self.batch_size = 500
 
         self.model = nn.Sequential(
                           nn.Conv2d(3, 32, kernel_size=(5,5), stride=(1,1)),
@@ -43,7 +46,18 @@ class Model():
         #: train˙input : tensor of size (N, C, H, W) containing a noisy version of the images
         #: train˙target : tensor of size (N, C, H, W) containing another noisy version of the
         # same images , which only differs from the input by their noise .
-        
+        for e in range(self.nb_epoch):
+            i = 0
+            for input, targets in zip(train_input.split(self.batch_size),  
+                                      train_target.split(self.batch_size)):
+                output = self.model(input)
+                loss = self.criterion(output, targets)
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+                i+=1
+                #print("Nb of batch is: "+str(i))
+            print("Nb of epoch is: "+str(e))
         
 
         pass
@@ -64,25 +78,40 @@ def display_img(img):
     
     plt.figure()
     plt.imshow(image)
+    
+#######################################################################################
 
+subset = 1000
+val_subste = 100
 noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
-noisy_imgs_1 = noisy_imgs_1.float()
-noisy_imgs_2 = noisy_imgs_2.float()
+#We neet float type to 
+noisy_imgs_1 = noisy_imgs_1[0:subset,:,:,:].float()
+noisy_imgs_2 = noisy_imgs_2[0:subset,:,:,:].float()
 
 mean, std = noisy_imgs_1.mean(), noisy_imgs_1.std()
 noisy_imgs_1.sub_(mean).div_(std)
 noisy_imgs_2.sub_(mean).div_(std)
 
-sample = noisy_imgs_1[0,:,:,:].view(1,3,32,32)
+noisy_imgs , clean_imgs = torch.load ('val_data.pkl')
+noisy_imgs = noisy_imgs_1[0:subset,:,:,:].float()
+clean_imgs = noisy_imgs_2[0:subset,:,:,:].float()
+
+noisy_imgs.sub_(mean).div_(std)
+clean_imgs.sub_(mean).div_(std)
 
 model = Model()
-prediction = model.model(sample)
 
+#If your computer is equiped with a GPU, the computation will happen there
+if torch.cuda.is_available():
+    model.model.cuda()
+    noisy_imgs_1 =noisy_imgs_1.cuda()
+    noisy_imgs_2 = noisy_imgs_2.cuda()
+
+model.train(noisy_imgs_1, noisy_imgs_2)
 
 image_number = 0
 display_img(noisy_imgs_1[image_number,:,:,:])
 display_img(noisy_imgs_2[image_number,:,:,:])
-display_img(prediction[0,:,:,:])
 
 
 
