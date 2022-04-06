@@ -53,6 +53,17 @@ class Model():
         #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network .
         pass
+    
+def display_img(img):
+    
+    image = img.permute(1,2,0)
+
+    #if the image is float type, it has been normalized. We need to denormalize it before showing
+    if image.dtype == torch.float32:
+        image = (image*std+mean).int()
+    
+    plt.figure()
+    plt.imshow(image)
 
 noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
 noisy_imgs_1 = noisy_imgs_1.float()
@@ -60,20 +71,18 @@ noisy_imgs_2 = noisy_imgs_2.float()
 
 mean, std = noisy_imgs_1.mean(), noisy_imgs_1.std()
 noisy_imgs_1.sub_(mean).div_(std)
+noisy_imgs_2.sub_(mean).div_(std)
 
 sample = noisy_imgs_1[0,:,:,:].view(1,3,32,32)
 
 model = Model()
 prediction = model.model(sample)
 
-def display_img(img):
-    plt.figure()
-    image = img.permute(1,2,0)
-    plt.imshow(image)
 
-image_number = 1
+image_number = 0
 display_img(noisy_imgs_1[image_number,:,:,:])
 display_img(noisy_imgs_2[image_number,:,:,:])
+display_img(prediction[0,:,:,:])
 
 
 
