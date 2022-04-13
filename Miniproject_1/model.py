@@ -77,11 +77,12 @@ class Model(nn.Module):
     
 def display_img(img):
     
-    image = img.permute(1,2,0)
-    
-    plt.figure()
-    plt.imshow(image)
-    
+    with torch.no_grad(): 
+        image = img.permute(1,2,0)
+        
+        plt.figure()
+        plt.imshow(image)
+        
 #######################################################################################
 
 subset_train = 1000
@@ -98,19 +99,25 @@ test_imgs , clean_imgs = torch.load ('val_data.pkl')
 test_imgs = test_imgs[0:subset_test,:,:,:]/max_pxl
 clean_imgs = clean_imgs[0:subset_test,:,:,:]/max_pxl
 
-model = Model()
+noise2noise = Model()
 
 #If your computer is equiped with a GPU, the computation will happen there
 if torch.cuda.is_available():
-    model.model.cuda()
-    noisy_imgs_1 =noisy_imgs_1.cuda()
+    noise2noise.model.cuda()
+    noisy_imgs_1 = noisy_imgs_1.cuda()
     noisy_imgs_2 = noisy_imgs_2.cuda()
 
-model.train(noisy_imgs_1, noisy_imgs_2, test_imgs, clean_imgs)
+noise2noise.train(noisy_imgs_1, noisy_imgs_2, test_imgs, clean_imgs)
 
+if torch.cuda.is_available():
+    noise2noise.model.to('cpu')
+    
+    
 image_number = 0
-display_img(noisy_imgs_1[image_number,:,:,:])
-display_img(noisy_imgs_2[image_number,:,:,:])
+img = test_imgs[image_number,:,:,:]
+display_img(img)
+predicted = noise2noise.predict(img.unsqueeze(0))
+display_img(predicted.squeeze())
 
 
 
