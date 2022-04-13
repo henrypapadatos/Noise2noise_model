@@ -73,7 +73,7 @@ class Model(nn.Module):
             
             print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
             
-            #display denoised images ten times during training
+            #display denoised images 25 times during training
             if vizualisation_flag and (e%(self.nb_epoch//25)==0):
                 training_visualisation(denoised)
 
