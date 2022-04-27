@@ -2,6 +2,15 @@ import torch
 from torch import nn
 import matplotlib.pyplot as plt
 
+class PrintLayer(nn.Module):
+    def __init__(self):
+        super(PrintLayer, self).__init__()
+    
+    def forward(self, x):
+        # Do your print / debug stuff here
+        print(x.shape)
+        return x
+
 class Model(nn.Module):
     def __init__(self):
         ## instantiate model + optimizer + loss function + any other stuff you need
@@ -12,10 +21,14 @@ class Model(nn.Module):
         self.batch_size = 100
 
         self.model = nn.Sequential(
+                          #PrintLayer(), # Add Print layer for debug
                           nn.Conv2d(3, 32, kernel_size=(5,5), stride=(1,1)),
                           nn.ReLU(),
-                          nn.MaxPool2d(2),
+                          #PrintLayer(), # Add Print layer for debug
+                          nn.MaxPool2d(2, stride=1, padding=1),
+                          #PrintLayer(), # Add Print layer for debug
                           nn.Conv2d(32, 32, kernel_size=(5,5), stride=(1,1)),
+                          #PrintLayer(), # Add Print layer for debug
                           nn.ReLU(),
                           nn.Conv2d(32, 32, kernel_size=(4,4), stride=(2,2)),
                           nn.ReLU(),
