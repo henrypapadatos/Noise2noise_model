@@ -9,12 +9,12 @@ class Model(nn.Module):
         super().__init__()
         self.lr = 0.001
         self.nb_epoch = 100
-        
         self.batch_size = 100
 
         self.model = nn.Sequential(
                           nn.Conv2d(3, 32, kernel_size=(5,5), stride=(1,1)),
                           nn.ReLU(),
+                          nn.MaxPool2d(2),
                           nn.Conv2d(32, 32, kernel_size=(5,5), stride=(1,1)),
                           nn.ReLU(),
                           nn.Conv2d(32, 32, kernel_size=(4,4), stride=(2,2)),
@@ -23,6 +23,7 @@ class Model(nn.Module):
                           nn.ReLU(),
                           nn.Conv2d(32, 8, kernel_size=(4,4), stride=(1,1)),
                           nn.ReLU(),
+                          
                           nn.ConvTranspose2d(8, 32, kernel_size=(4,4), stride=(1,1)),
                           nn.ReLU(),
                           nn.ConvTranspose2d(32, 32, kernel_size=(3,3), stride=(2,2)),
@@ -33,6 +34,9 @@ class Model(nn.Module):
                           nn.ReLU(),
                           nn.ConvTranspose2d(32, 3, kernel_size=(5,5), stride=(1,1)),
                           nn.ReLU(),                       
+                          
+
+                          
                           )
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.lr)
@@ -128,11 +132,15 @@ noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
 max_pxl = noisy_imgs_1.max().item()
 #We neet float type to 
 noisy_imgs_1 = noisy_imgs_1[0:subset_train,:,:,:]/max_pxl
+noisy_imgs_1 = noisy_imgs_1.float()
 noisy_imgs_2 = noisy_imgs_2[0:subset_train,:,:,:]/max_pxl
+noisy_imgs_2 = noisy_imgs_2.float()
 
 test_imgs , clean_imgs = torch.load ('val_data.pkl')
 test_imgs = test_imgs[0:subset_test,:,:,:]/max_pxl
+test_imgs = test_imgs.float()
 clean_imgs = clean_imgs[0:subset_test,:,:,:]/max_pxl
+clean_imgs = clean_imgs.float()
 
 noise2noise = Model()
 
