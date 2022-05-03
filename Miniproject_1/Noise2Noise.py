@@ -11,53 +11,68 @@ class PrintLayer(nn.Module):
         print(x.shape)
         return x
 
+class NetBlock(nn.Module):
+    def __init__(self, input_channel, output_channel, kernel_size, stride):
+        super().__init__()
+
+        self.stride = stride
+
+        self.conv1 = nn.Conv2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2)
+        self.convskip = nn.Conv2d(input_channel, output_channel, kernel_size=(1,1), stride=(stride,stride))
+        self.bn1 = nn.BatchNorm2d(output_channel)
+        self.Relu = nn.ReLU()
+
+    def forward(self, x):
+        y = self.bn1(self.conv1(x))
+        if self.stride != 1:
+            x = self.convskip(x)
+        y += x
+        y = self.Relu(y) 
+        return y 
 
 
 class Net(nn.Module):
     def __init__(self):
         super().__init__() #parent class refers to nn.module
+        
         self.conv1 = nn.Conv2d(3, 32, kernel_size=(5,5), stride=(1,1))
         self.conv2 = nn.Conv2d(32, 32, kernel_size=(5,5), stride=(1,1))
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=(4,4), stride=(2,2))
-        self.conv4 = nn.Conv2d(32, 32, kernel_size=(3,3), stride=(2,2))
+        self.conv3 = nn.Conv2d(32, 32, kernel_size=(4,4), stride=(2,2)) #remove the even kernel
+        self.conv4 = nn.Conv2d(32, 32, kernel_size=(3,3), stride=(2,2)) # kernel 3,3 padding 1
         self.conv5 = nn.Conv2d(32, 8, kernel_size=(4,4), stride=(1,1))
         self.conv1t = nn.ConvTranspose2d(8, 32, kernel_size=(4,4), stride=(1,1))
         self.conv2t = nn.ConvTranspose2d(32, 32, kernel_size=(3,3), stride=(2,2))
         self.conv3t = nn.ConvTranspose2d(32, 32, kernel_size=(4,4), stride=(2,2))
-        self.conv4t = nn.ConvTranspose2d(32, 32, kernel_size=(5,5), stride=(1,1))
+        self.conv4t = nn.ConvTranspose2d(32, 32, kernel_size=(5,5), stride=(2,2), padding = (5 -1)//2, output_padding = 1)
         self.conv5t = nn.ConvTranspose2d(32, 3, kernel_size=(5,5), stride=(1,1))
-        self.relu =  nn.ReLU()
+        self.Relu =  nn.ReLU()
+        self.NetBLock1 = NetBlock(32,32,5,2) ## fancy python?
+
+        self.Pool = nn.MaxPool2d(kernel_size = 2, return_indices = True)
+        self.unPool = nn.MaxUnpool2d(kernel_size = 2)
+
         # https://pytorch.org/vision/0.8/_modules/torchvision/models/resnet.html
         #self.downsample = downsample
-        
-        #nn.Sequential(
-            #nn.Conv2d(3, 32, kernel_size=(5,5), stride=(1,1)),
-            #nn.ReLU(),
-            #nn.MaxPool2d(2,2),
-            #PrintLayer(), # Add Print layer for debug
-            #nn.Conv2d(32, 32, kernel_size=(5,5), stride=(1,1)),
-            #nn.ReLU(),
-            #nn.Conv2d(32, 32, kernel_size=(4,4), stride=(2,2)), #remove the even kernel
-            #nn.ReLU(),
-            #nn.Conv2d(32, 32, kernel_size=(3,3), stride=(2,2)), #kernel 3,3 padding 1
-            #nn.ReLU(),
-            #nn.Conv2d(32, 8, kernel_size=(4,4), stride=(1,1)),
-            #nn.ReLU(),
-                          
-            #nn.ConvTranspose2d(8, 32, kernel_size=(4,4), stride=(1,1)),
-            #nn.ReLU(),
-            #nn.ConvTranspose2d(32, 32, kernel_size=(3,3), stride=(2,2)),
-            #nn.ReLU(),
-            #nn.ConvTranspose2d(32, 32, kernel_size=(4,4), stride=(2,2)),
-            #nn.ReLU(), 
-            #nn.ConvTranspose2d(32, 32, kernel_size=(5,5), stride=(1,1)),
-            #nn.ReLU(),
-            #nn.ConvTranspose2d(32, 3, kernel_size=(5,5), stride=(1,1)),
-            #nn.ReLU(),
-            #)
-
-    #def forward:
     
+        
+    def forward(self,x):
+        y = self.Relu(self.conv1(x))
+        #print("y_shape : ", y.shape)
+        y = self.NetBLock1(y)
+        #print("y_shape : ", y.shape)
+        y, indices = self.Pool(y)
+        #print("y_shape : ", y.shape)
+        y = self.Relu(y)
+        #print("y_shape : ", y.shape)
+        y = self.unPool(y, indices)
+        #print("y_shape : ", y.shape)
+        y =  self.conv4t(y)
+        #print("y_shape : ", y.shape)
+        y = self.conv5t(y)
+        #print("y_shape : ", y.shape)
+        return y
+
+  
 class Model():
     def __init__(self):
         ## instantiate model + optimizer + loss function + any other stuff you need
@@ -108,7 +123,7 @@ class Model():
             print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
             
             #display denoised images 25 times during training
-            if vizualisation_flag and (e%(self.nb_epoch//25)==0):
+            if vizualisation_flag and (e%(self.nb_epoch//10)==0):
                 training_visualisation(denoised)
 
     def predict(self, input_imgs):
@@ -126,7 +141,7 @@ class Model():
 def training_visualisation(imgs):
     #Plot the 4 first images of imgs in a subplot way
     fig=plt.figure()
-    nb_image = 4;
+    nb_image = 4
     for a in range(nb_image):
         with torch.no_grad():     
             b = imgs[a,:,:,:]
