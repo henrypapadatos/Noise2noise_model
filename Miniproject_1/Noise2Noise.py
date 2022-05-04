@@ -47,6 +47,7 @@ class Net(nn.Module):
         self.conv5t = nn.ConvTranspose2d(32, 3, kernel_size=(5,5), stride=(1,1))
         self.Relu =  nn.ReLU()
         self.NetBLock1 = NetBlock(32,32,5,2) ## fancy python?
+        self.Dropout = nn.Dropout(0.2)
 
         self.Pool = nn.MaxPool2d(kernel_size = 2, return_indices = True)
         self.unPool = nn.MaxUnpool2d(kernel_size = 2)
@@ -63,6 +64,7 @@ class Net(nn.Module):
         y, indices = self.Pool(y)
         #print("y_shape : ", y.shape)
         y = self.Relu(y)
+        y = self.Dropout(y)
         #print("y_shape : ", y.shape)
         y = self.unPool(y, indices)
         #print("y_shape : ", y.shape)
