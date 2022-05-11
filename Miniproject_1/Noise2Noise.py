@@ -61,9 +61,9 @@ class Net(nn.Module):
         
         self.NetBLock1 = NetBlock(32,32,3,2,transpose_flag=0) 
         self.TransNetBlock1 = NetBlock(32,32,3,2,transpose_flag=1)
-        self.NetBLock2 = NetBlock(32,64,3,1,transpose_flag=0) 
-        self.TransNetBLock2 = NetBlock(64,32,3,1,transpose_flag=1) 
-        #self.Dropout = nn.Dropout(0.2)
+        self.NetBLock2 = NetBlock(32,32,3,1,transpose_flag=0) 
+        self.TransNetBLock2 = NetBlock(32,32,3,1,transpose_flag=1) 
+        self.Dropout = nn.Dropout(0.2)
 
         self.Pool = nn.MaxPool2d(kernel_size = 2, return_indices = True)
         self.unPool = nn.MaxUnpool2d(kernel_size = 2)
@@ -82,14 +82,16 @@ class Net(nn.Module):
         if verbose:
             print("y_shape : ", y.shape)
         y = self.Relu(y)
+        y = self.Dropout(y)
+
         y = self.NetBLock1(y)
         if verbose:
             print("y_shape : ", y.shape)
-        y, indices = self.Pool(y)
+        #y, indices = self.Pool(y)
         if verbose:
             print("y_shape : ", y.shape)
         y = self.Relu(y)
-        #y = self.Dropout(y)
+        y = self.Dropout(y)
         y = self.NetBLock2(y)
         if verbose:
             print("y_shape : ", y.shape)
@@ -98,7 +100,7 @@ class Net(nn.Module):
         y = self.TransNetBLock2(y)
         if verbose:
             print("y_shape : ", y.shape)
-        y = self.unPool(y, indices)
+        #y = self.unPool(y, indices)
         if verbose:
             print("y_shape : ", y.shape)
         y =  self.TransNetBlock1(y)
@@ -115,9 +117,9 @@ class Model():
         ## instantiate model + optimizer + loss function + any other stuff you need
 
         super().__init__()
-        self.lr = 0.001
-        self.nb_epoch = 100
-        self.batch_size = 100
+        self.lr = 0.002
+        self.nb_epoch = 300
+        self.batch_size = 500
 
         self.model = Net()
            
@@ -147,6 +149,7 @@ class Model():
             i = 0
             for input, targets in zip(train_input.split(self.batch_size),  
                                       train_target.split(self.batch_size)):
+                self.model.train()
                 output = self.predict(input)
                 loss = self.criterion(output, targets)
                 self.optimizer.zero_grad()
@@ -154,6 +157,7 @@ class Model():
                 self.optimizer.step()
                 i+=1
             
+            self.model.eval()
             denoised = self.predict(test_input)
             psnr = self.psnr(denoised, test_target)
             
