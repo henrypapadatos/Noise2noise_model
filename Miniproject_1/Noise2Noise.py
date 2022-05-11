@@ -10,22 +10,41 @@ class PrintLayer(nn.Module):
         # Do your print / debug stuff here
         print(x.shape)
         return x
+    
+    
 
 class NetBlock(nn.Module):
-    def __init__(self, input_channel, output_channel, kernel_size, stride):
+    def __init__(self, input_channel, output_channel, kernel_size, stride, transpose_flag):
         super().__init__()
 
         self.stride = stride
-
-        self.conv1 = nn.Conv2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2)
-        self.convskip = nn.Conv2d(input_channel, output_channel, kernel_size=(1,1), stride=(stride,stride))
+        self.transpose_flag = transpose_flag
+        
+        if self.transpose_flag:
+            if self.stride==1:
+                self.convTrans1 = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2)
+                self.convSkipTrans = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(1,1), stride=(stride,stride))
+            elif self.stride==2:
+                self.convTrans1 = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2, output_padding = 1)
+                self.convSkipTrans = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(1,1), stride=(stride,stride), output_padding = 1)
+         
+        else:
+            self.conv1 = nn.Conv2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2)
+            self.convSkip = nn.Conv2d(input_channel, output_channel, kernel_size=(1,1), stride=(stride,stride))
+        
         self.bn1 = nn.BatchNorm2d(output_channel)
         self.Relu = nn.ReLU()
 
     def forward(self, x):
-        y = self.bn1(self.conv1(x))
-        if self.stride != 1:
-            x = self.convskip(x)
+        if self.transpose_flag:
+            y = self.convTrans1(x)
+        else:
+            y = self.conv1(x)
+        y = self.bn1(y)
+        if self.transpose_flag:
+            x = self.convSkipTrans(x)
+        else:
+            x = self.convSkip(x)
         y += x
         y = self.Relu(y) 
         return y 
@@ -35,18 +54,15 @@ class Net(nn.Module):
     def __init__(self):
         super().__init__() #parent class refers to nn.module
         
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=(5,5), stride=(1,1))
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=(5,5), stride=(1,1))
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=(4,4), stride=(2,2)) #remove the even kernel
-        self.conv4 = nn.Conv2d(32, 32, kernel_size=(3,3), stride=(2,2)) # kernel 3,3 padding 1
-        self.conv5 = nn.Conv2d(32, 8, kernel_size=(4,4), stride=(1,1))
-        self.conv1t = nn.ConvTranspose2d(8, 32, kernel_size=(4,4), stride=(1,1))
-        self.conv2t = nn.ConvTranspose2d(32, 32, kernel_size=(3,3), stride=(2,2))
-        self.conv3t = nn.ConvTranspose2d(32, 32, kernel_size=(4,4), stride=(2,2))
-        self.conv4t = nn.ConvTranspose2d(32, 32, kernel_size=(5,5), stride=(2,2), padding = (5 -1)//2, output_padding = 1)
-        self.conv5t = nn.ConvTranspose2d(32, 3, kernel_size=(5,5), stride=(1,1))
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=(3,3), stride=(1,1), padding = (3 -1)//2)
+        self.conv5t = nn.ConvTranspose2d(32, 3, kernel_size=(3,3), stride=(1,1), padding = (3 -1)//2)
         self.Relu =  nn.ReLU()
-        self.NetBLock1 = NetBlock(32,32,5,2) ## fancy python?
+        
+        
+        self.NetBLock1 = NetBlock(32,32,3,2,transpose_flag=0) 
+        self.TransNetBlock1 = NetBlock(32,32,3,2,transpose_flag=1)
+        self.NetBLock2 = NetBlock(32,32,3,1,transpose_flag=0) 
+        self.TransNetBLock2 = NetBlock(32,32,3,1,transpose_flag=1) 
         self.Dropout = nn.Dropout(0.2)
 
         self.Pool = nn.MaxPool2d(kernel_size = 2, return_indices = True)
@@ -57,21 +73,42 @@ class Net(nn.Module):
     
         
     def forward(self,x):
-        y = self.Relu(self.conv1(x))
-        #print("y_shape : ", y.shape)
-        y = self.NetBLock1(y)
-        #print("y_shape : ", y.shape)
-        y, indices = self.Pool(y)
-        #print("y_shape : ", y.shape)
+        
+        verbose = False
+        
+        if verbose:
+            print("x_shape : ", x.shape)   
+        y = self.conv1(x)
+        if verbose:
+            print("y_shape : ", y.shape)
         y = self.Relu(y)
         y = self.Dropout(y)
-        #print("y_shape : ", y.shape)
-        y = self.unPool(y, indices)
-        #print("y_shape : ", y.shape)
-        y =  self.conv4t(y)
-        #print("y_shape : ", y.shape)
+
+        y = self.NetBLock1(y)
+        if verbose:
+            print("y_shape : ", y.shape)
+        #y, indices = self.Pool(y)
+        if verbose:
+            print("y_shape : ", y.shape)
+        y = self.Relu(y)
+        y = self.Dropout(y)
+        y = self.NetBLock2(y)
+        if verbose:
+            print("y_shape : ", y.shape)
+        y = self.Relu(y)
+    
+        y = self.TransNetBLock2(y)
+        if verbose:
+            print("y_shape : ", y.shape)
+        #y = self.unPool(y, indices)
+        if verbose:
+            print("y_shape : ", y.shape)
+        y =  self.TransNetBlock1(y)
+        if verbose:
+            print("y_shape : ", y.shape)
         y = self.conv5t(y)
-        #print("y_shape : ", y.shape)
+        if verbose:
+            print("y_shape : ", y.shape)
         return y
 
   
@@ -80,9 +117,9 @@ class Model():
         ## instantiate model + optimizer + loss function + any other stuff you need
 
         super().__init__()
-        self.lr = 0.001
-        self.nb_epoch = 100
-        self.batch_size = 100
+        self.lr = 0.002
+        self.nb_epoch = 300
+        self.batch_size = 500
 
         self.model = Net()
            
@@ -112,6 +149,7 @@ class Model():
             i = 0
             for input, targets in zip(train_input.split(self.batch_size),  
                                       train_target.split(self.batch_size)):
+                self.model.train()
                 output = self.predict(input)
                 loss = self.criterion(output, targets)
                 self.optimizer.zero_grad()
@@ -119,6 +157,7 @@ class Model():
                 self.optimizer.step()
                 i+=1
             
+            self.model.eval()
             denoised = self.predict(test_input)
             psnr = self.psnr(denoised, test_target)
             
@@ -196,6 +235,8 @@ if torch.cuda.is_available():
     noise2noise.model.cuda()
     noisy_imgs_1 = noisy_imgs_1.cuda()
     noisy_imgs_2 = noisy_imgs_2.cuda()
+    test_imgs = test_imgs.cuda()
+    clean_imgs = clean_imgs.cuda()
 
 noise2noise.train(noisy_imgs_1, noisy_imgs_2, test_imgs, clean_imgs, vizualisation_flag=True)    
     
