@@ -22,11 +22,12 @@ class NetBlock(nn.Module):
         
         if self.transpose_flag:
             if self.stride==1:
-                self.convTrans1 = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2)
                 self.convSkipTrans = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(1,1), stride=(stride,stride))
+                self.convTrans1 = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2)
             elif self.stride==2:
                 self.convTrans1 = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2, output_padding = 1)
                 self.convSkipTrans = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(1,1), stride=(stride,stride), output_padding = 1)
+                #self.convSkipTrans = nn.Upsample(scale_factor=2, mode='bilinear')
          
         else:
             self.conv1 = nn.Conv2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2)
@@ -51,9 +52,10 @@ class NetBlock(nn.Module):
 
 
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, batch_size):
         super().__init__() #parent class refers to nn.module
         
+        self.batch_size = batch_size
         self.conv1 = nn.Conv2d(3, 32, kernel_size=(3,3), stride=(1,1), padding = (3 -1)//2)
         self.conv5t = nn.ConvTranspose2d(32, 3, kernel_size=(3,3), stride=(1,1), padding = (3 -1)//2)
         self.Relu =  nn.ReLU()
@@ -67,6 +69,9 @@ class Net(nn.Module):
 
         self.Pool = nn.MaxPool2d(kernel_size = 2, return_indices = True)
         self.unPool = nn.MaxUnpool2d(kernel_size = 2)
+        self.sigmoid = nn.Sigmoid()
+        
+        self.linear = nn.Linear(32*16*16,32*16*16)
 
         # https://pytorch.org/vision/0.8/_modules/torchvision/models/resnet.html
         #self.downsample = downsample
@@ -74,7 +79,7 @@ class Net(nn.Module):
         
     def forward(self,x):
         
-        verbose = False
+        verbose = True
         
         if verbose:
             print("x_shape : ", x.shape)   
@@ -92,12 +97,13 @@ class Net(nn.Module):
             print("y_shape : ", y.shape)
         y = self.Relu(y)
         y = self.Dropout(y)
-        y = self.NetBLock2(y)
+        #y = self.NetBLock2(y)
         if verbose:
             print("y_shape : ", y.shape)
-        y = self.Relu(y)
+        y = self.linear(y.view(self.batch_size,32*16*16))
+        y = self.Relu(y).view(self.batch_size,32,16,16)
     
-        y = self.TransNetBLock2(y)
+        #y = self.TransNetBLock2(y)
         if verbose:
             print("y_shape : ", y.shape)
         #y = self.unPool(y, indices)
@@ -109,6 +115,7 @@ class Net(nn.Module):
         y = self.conv5t(y)
         if verbose:
             print("y_shape : ", y.shape)
+        y = self.sigmoid(y)
         return y
 
   
@@ -118,10 +125,10 @@ class Model():
 
         super().__init__()
         self.lr = 0.002
-        self.nb_epoch = 300
-        self.batch_size = 500
+        self.nb_epoch = 100
+        self.batch_size = 100
 
-        self.model = Net()
+        self.model = Net(self.batch_size)
            
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.lr)
         self.criterion = nn.MSELoss()
