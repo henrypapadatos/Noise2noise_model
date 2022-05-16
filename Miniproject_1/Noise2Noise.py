@@ -61,8 +61,8 @@ class Net(nn.Module):
         self.Relu =  nn.ReLU()
         
         
-        self.NetBLock1 = NetBlock(32,32,3,2,transpose_flag=0) 
-        self.TransNetBlock1 = NetBlock(32,32,3,2,transpose_flag=1)
+        self.NetBLock1 = NetBlock(32,32,5,2,transpose_flag=0) 
+        self.TransNetBlock1 = NetBlock(32,32,5,2,transpose_flag=1)
         self.NetBLock2 = NetBlock(32,32,3,1,transpose_flag=0) 
         self.TransNetBLock2 = NetBlock(32,32,3,1,transpose_flag=1) 
         self.Dropout = nn.Dropout(0.2)
