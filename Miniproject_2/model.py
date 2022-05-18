@@ -73,14 +73,42 @@ class ConvLayer(Module):
 
         self.stride = stride
         self.kernel_size = kernel_size
-
+        
+        k = np.sqrt(1/(iput_channel*kernel_size[0]*kernel_size[1]))
+        self.weights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
+        self.bias = torch.empty(output_channel).uniform_(-k,k)
+        self.gradweights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1])*0
+        self.gradbias = torch.empty(output_channel)*0
+        
+    #initialize them here and gradients should at 0 
     def forward (self,x):
-        # unfold(x,) and liearize it to be able to use what we did in the exercise session 
-        return
+        # unfold(x,) and liearize it to be able to use what we did in the exercise session
+        unfold = torch.nn.Unfold(kernel_size = self.kernel_size)
+        output = unfold(x)
+
+        
+        return 
+
     def backward (self,y):
         #taking the deriative of "linear conv"
         return
     def param ( self ) :
+        return [self.weights, self.bias, self.gradweights, self.gradbias]
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+    
         return []
 
 
