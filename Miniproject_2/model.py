@@ -1,5 +1,6 @@
 
 import torch
+from torch import nn
 from torch import empty
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,67 +12,62 @@ class Module ( object ) :
         raise NotImplementedError
     def backward ( self , y) :
         raise NotImplementedError
+    def SGD ( self , lr):
+        pass
     def param ( self ) :
-        return []
+        pass
 
 
 torch.set_grad_enabled(False)
 
-class Relu():
+class Relu(Module):
     def forward ( self , x) :
-        return max(0.0, x)
+        return x*(x>0)
     def backward ( self , y  ) :
-        if y>0:
-            return 1
-        else:
-            return 0
+        return (y>0)
 
-    def param ( self ) :
-        return []
-
-class Sigmoid():
+class Sigmoid(Module):
     def forward (self , x) :
         return 1/(1+(-x).exp())
     def backward ( self , y) :
         return (-y).exp()/(1+(-y).exp()).pow(2)
-    def param ( self ) :
-        return []
     
-class MSE():
+class MSE(Module):
     def forward (self , x, x_target) :
         return (x - x_target).pow(2).mean()
     def backward ( self , y, y_target) :
         return 2* (y-y_target).mean()
-    def param ( self ) :
-        return []
-    
-class Seq(): #MODIFY: supposed run sequentially all the stuff you are asking it to 
-    # ex: 1 Sequential ( Conv ( stride 2) , ReLU , Conv ( stride 2) , ReLU , Upsampling , ReLU , Upsampling , Sigmoid )
+
+class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are asking it to 
+    def __init__(self, *type_layer):
+        #super().__init__()
+        self.type_layer = type_layer
+    # ex: 1 Sequential ( Conv( stride 2) , ReLU , Conv ( stride 2) , ReLU , Upsampling , ReLU , Upsampling , Sigmoid )
+
     def forward (self,x):
-        #ConvLayer(stride = 2)
-        Relu.forward(x)
-        #ConvLayer(stride = 2)
-        Relu.forward(x)
-        #Upsampling()
-        Relu.forward(x)
-        #Upsampling()
-        Sigmoid.forward(x)
+        # for looop from start to begning
+        print("y",x)
+        for layer in self.type_layer:
+            #later we will have to call layer.param
+            x = layer.forward(x)
+            #layer.forward(layer.param())
+            print("forward_layer",x)
+        return x
     
     def backward (self,y):
-        #ConvLayer(stride = 2)
-        Relu.backward(y)
-        #ConvLayer(stride = 2)
-        Relu.backward(y)
-        #Upsampling()
-        Relu.backward(y)
-        #Upsampling()
-        Sigmoid.backward(y)
+        print("y",y)
+        for layer in reversed(self.type_layer):
+            y = layer.backward(y)
+            print("backward_layer",y)
+
+        return y
 
     def param ( self ) :
         return []
 
 
-class ConvLayer():
+
+class ConvLayer(Module):
     def __init__(self, input_channel, output_channel, kernel_size, stride):
         super().__init__()
 
@@ -86,3 +82,17 @@ class ConvLayer():
         return
     def param ( self ) :
         return []
+
+
+print("First Try")
+y = torch.normal(0, 1, size=(3,2,2))
+relu = Relu()
+sigmoid = Sigmoid()
+sequential = Seq(relu,sigmoid)
+y = sequential.forward(y)
+y = sequential.backward(y)
+
+sequentialll = nn.Sequential(nn.ReLU(),nn.Sigmoid())
+y = sequentialll(y)
+y.backward()
+y.grad
