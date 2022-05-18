@@ -74,7 +74,7 @@ class ConvLayer(Module):
         self.stride = stride
         self.kernel_size = kernel_size
         
-        k = np.sqrt(1/(iput_channel*kernel_size[0]*kernel_size[1]))
+        k = np.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         self.weights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
         self.bias = torch.empty(output_channel).uniform_(-k,k)
         self.gradweights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1])*0
@@ -94,23 +94,6 @@ class ConvLayer(Module):
         return
     def param ( self ) :
         return [self.weights, self.bias, self.gradweights, self.gradbias]
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
-    
-        return []
-
 
 print("First Try")
 y = torch.normal(0, 1, size=(3,2,2))
