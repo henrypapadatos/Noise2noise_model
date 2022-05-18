@@ -143,10 +143,9 @@ class Model():
     def __init__(self):
         ## instantiate model + optimizer + loss function + any other stuff you need
 
-        super().__init__()
         self.lr = 0.002
         self.nb_epoch = 100
-        self.batch_size = 1000
+        self.batch_size = 100
 
         self.model = Net(self.batch_size)
            
