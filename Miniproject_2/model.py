@@ -7,6 +7,7 @@ import numpy as np
 from torch.nn.functional import fold
 from torch.nn.functional import unfold
 
+
 class Module ( object ) :
     def forward ( self , x ) :
         raise NotImplementedError
@@ -18,7 +19,7 @@ class Module ( object ) :
         pass
 
 
-torch.set_grad_enabled(False)
+torch.set_grad_enabled(True)
 
 class Relu(Module):
     def forward ( self , x) :
@@ -42,6 +43,7 @@ class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are aski
     def __init__(self, *type_layer):
         #super().__init__()
         self.type_layer = type_layer
+        self.loss = MSE()
     # ex: 1 Sequential ( Conv( stride 2) , ReLU , Conv ( stride 2) , ReLU , Upsampling , ReLU , Upsampling , Sigmoid )
 
     def forward (self,x):
@@ -54,8 +56,9 @@ class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are aski
             print("forward_layer",x)
         return x
     
-    def backward (self,y):
+    def backward (self,y, target):
         print("y",y)
+        y = loss.backward(y, target)
         for layer in reversed(self.type_layer):
             y = layer.backward(y)
             print("backward_layer",y)
@@ -95,15 +98,49 @@ class ConvLayer(Module):
     def param ( self ) :
         return [self.weights, self.bias, self.gradweights, self.gradbias]
 
-print("First Try")
-y = torch.normal(0, 1, size=(3,2,2))
-relu = Relu()
-sigmoid = Sigmoid()
-sequential = Seq(relu,sigmoid)
-y = sequential.forward(y)
-y = sequential.backward(y)
+input_tensor = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
+target = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
 
-sequentialll = nn.Sequential(nn.ReLU(),nn.Sigmoid())
-y = sequentialll(y)
-y.backward()
-y.grad
+sequential_torch = nn.Sequential(nn.ReLU(),nn.Sigmoid())
+
+criterion = nn.MSELoss()
+
+y = sequential_torch(input_tensor)
+
+loss = criterion(y, target)
+
+# loss_val = loss(y, target)
+
+loss.backward()
+
+
+
+
+
+
+# loss = MSE()
+
+# our_loss = loss.forward(input_tensor, target)
+# torch_loss = nn.MSELoss()
+
+# torch_loss_val = torch_loss(input_tensor, target)
+
+# print(our_loss-torch_loss_val)
+
+# relu = Relu()
+# sigmoid = Sigmoid()
+# sequential = Seq(relu,sigmoid)
+
+# sequential_torch = nn.Sequential(nn.ReLU(),nn.Sigmoid())
+
+
+# y = sequential.forward(input_tensor)
+
+# y_torch = sequential_torch(input_tensor)
+
+# print(y-y_torch)
+
+# y = sequential.backward(y)
+
+# # y_torch.backward(gradient)
+# print(y-torch.gradient(y_torch))
