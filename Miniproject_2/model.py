@@ -88,8 +88,9 @@ class ConvLayer(Module):
         # unfold(x,) and liearize it to be able to use what we did in the exercise session
         unfold = torch.nn.Unfold(kernel_size = self.kernel_size)
         output = unfold(x)
-
-        
+        wxb = conv.weight.view(out ̇channels, -1) @ unfolded + conv.bias.view(1, -1, 1)
+        actual = wxb.view(1, out ̇channels, x.shape[2] - kernel ̇size[0] + 1, x.shape[3] - kernel ̇size[1]+ 1)
+ 
         return 
 
     def backward (self,y):
