@@ -18,9 +18,6 @@ class Module ( object ) :
     def param ( self ) :
         pass
 
-
-torch.set_grad_enabled(True)
-
 class Relu(Module):
     def forward ( self , x) :
         return x*(x>0)
@@ -86,10 +83,10 @@ class ConvLayer(Module):
     #initialize them here and gradients should at 0 
     def forward (self,x):
         # unfold(x,) and liearize it to be able to use what we did in the exercise session
-        unfold = torch.nn.Unfold(kernel_size = self.kernel_size)
-        output = unfold(x)
-        wxb = conv.weight.view(out ̇channels, -1) @ unfolded + conv.bias.view(1, -1, 1)
-        actual = wxb.view(1, out ̇channels, x.shape[2] - kernel ̇size[0] + 1, x.shape[3] - kernel ̇size[1]+ 1)
+        # unfold = torch.nn.Unfold(kernel_size = self.kernel_size)
+        # output = unfold(x)
+        # wxb = conv.weight.view(out ̇channels, -1) @ unfolded + conv.bias.view(1, -1, 1)
+        # actual = wxb.view(1, out ̇channels, x.shape[2] - kernel ̇size[0] + 1, x.shape[3] - kernel ̇size[1]+ 1)
  
         return 
 
@@ -116,6 +113,7 @@ loss.backward()
 
 
 
+torch.set_grad_enabled(True)
 
 
 
