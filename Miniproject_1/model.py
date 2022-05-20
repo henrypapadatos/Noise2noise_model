@@ -170,7 +170,7 @@ class Model():
             training_visualisation(test_target)
             training_visualisation(test_input)
 
-        initial_psnr = self.psnr(test_input, test_target)
+        initial_psnr = self.psnr(test_input/255, test_target/255)
         print('Psnr value between clean and noisy images is: {:.02f}'.format(initial_psnr))
 
         for e in range(self.nb_epoch):
@@ -179,7 +179,7 @@ class Model():
                                       train_target.split(self.batch_size)):
                 self.model.train()
                 output = self.predict(input)
-                loss = self.criterion(output, targets)
+                loss = self.criterion(output, targets/255)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -187,7 +187,7 @@ class Model():
             
             self.model.eval()
             denoised = self.predict(test_input)
-            psnr = self.psnr(denoised, test_target)
+            psnr = self.psnr(denoised, test_target/255)
             
             print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
             
@@ -198,7 +198,10 @@ class Model():
     def predict(self, input_imgs):
         #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network .
-        output = self.model(input_imgs)
+        
+        #normalize image between 0 and 1
+        input_imgs_ = input_imgs/255
+        output = self.model(input_imgs_)
         return output
     
     def psnr(self, denoised, ground_truth):
