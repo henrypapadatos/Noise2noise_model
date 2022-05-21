@@ -159,6 +159,9 @@ class Model():
         #: train˙input : tensor of size (N, C, H, W) containing a noisy version of the images
         #: train˙target : tensor of size (N, C, H, W) containing another noisy version of the
         # same images , which only differs from the input by their noise .
+        
+        #REMOVE THIS BEFORE SUBMIT
+        num_epochs = 10
 
         #If flag is true, plot the clean image and the noisy image
         if vizualisation_flag and test_input!=None:
