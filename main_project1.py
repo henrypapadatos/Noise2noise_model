@@ -12,8 +12,8 @@ from Miniproject_1 import model
 import debug_model
 
 
-subset_train = 100
-subset_test = 100
+subset_train = 50000
+subset_test = 10000
 
 noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
 

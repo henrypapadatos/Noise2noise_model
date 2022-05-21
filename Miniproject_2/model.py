@@ -32,38 +32,46 @@ class Sigmoid(Module):
     
 class MSE(Module):
     def forward (self , x, x_target) :
-        return (x - x_target).pow(2).mean()
-    def backward ( self , y, y_target) :
-        return 2* (y-y_target).mean()
+        self.prediction = x 
+        self.target = x_target
+        return (self.prediction - self.target).pow(2).mean()
+    def backward ( self) :
+        return 2* (self.prediction-self.target).mean()
 
-class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are asking it to 
+class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you are asking it to 
     def __init__(self, *type_layer):
         #super().__init__()
         self.type_layer = type_layer
-        self.loss = MSE()
     # ex: 1 Sequential ( Conv( stride 2) , ReLU , Conv ( stride 2) , ReLU , Upsampling , ReLU , Upsampling , Sigmoid )
 
     def forward (self,x):
         # for looop from start to begning
-        print("y",x)
+        #print("y",x)
+        x_ = x
         for layer in self.type_layer:
             #later we will have to call layer.param
-            x = layer.forward(x)
+            x_ = layer.forward(x_)
             #layer.forward(layer.param())
-            print("forward_layer",x)
-        return x
+            #print("forward_layer",x_)
+        return x_
     
-    def backward (self,y, target):
-        print("y",y)
-        y = loss.backward(y, target)
+    def backward (self,y):
+        #print("y",y)
+        y_ = y 
         for layer in reversed(self.type_layer):
-            y = layer.backward(y)
-            print("backward_layer",y)
+            y_ = layer.backward(y_)
+            #print("backward_layer",y_)
+            #print("backward_layer",y_)
 
-        return y
+        return y_
 
     def param ( self ) :
-        return []
+
+        param = []
+        for layer in self.type_layer:
+            param.append(layer.param())
+
+        return param
 
 
 
@@ -99,7 +107,6 @@ class Conv2d(Module):
         return output
         
     def forward (self,x):
-        print("TYPE",x.type)
         x_ = x
         x_ = self.conv(x_)
         return x_
@@ -153,50 +160,94 @@ class Optimizer(Module):
 
 
 
-input_tensor = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
-target = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
+def training_visualisation(imgs):
+    #Plot the 4 first images of imgs in a subplot way
+    fig=plt.figure()
+    nb_image = 4
+    for a in range(nb_image):
+        with torch.no_grad():     
+            b = imgs[a,:,:,:].int()
+            if torch.cuda.is_available():
+                b = b.to('cpu')
+            b = b.permute(1,2,0)    
+            ax = fig.add_subplot(1, nb_image, a+1)
+            subplot_title=("Image"+str(a))
+            ax.set_title(subplot_title)  
+            plt.imshow(b)
+    fig.tight_layout() 
+    plt.pause(0.001)
+    
+class Model():
+    def __init__(self):
+        self.lr = 0.002
+        self.nb_epoch = 100
+        self.batch_size = 1000
+        self.optimizer = None
+        self.criterion = MSE()
+        self.Conv = Conv2d()
+        self.ReLU = Relu()
+        self.Sigmoid = Sigmoid()
+        #self.Upsampling = Upsampling()
+        #self.model = Sequential(self.Conv(3,3,3) , self.ReLU , self.Conv(3,3,3) , self.ReLU , self.Upsampling , self.ReLU , self.Upsampling , self.Sigmoid)
+        self.model = Sequential()
 
-sequential_torch = nn.Sequential(nn.ReLU(),nn.Sigmoid())
+    
+    def load_pretrained_model(self):
+        ## This loads the parameters saved in bestmodel .pth into the model$
+        #full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
+        #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
+        pass 
+    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
+        num_epochs = 10
 
-criterion = nn.MSELoss()
+        if vizualisation_flag and test_input!=None:
+            plt.ion()
+            plt.show()
+            training_visualisation(test_target)
+            training_visualisation(test_input)
+        
+        if test_input!=None:
+            initial_psnr = self.psnr(test_input/255, test_target/255)
+            print('Psnr value between clean and noisy images is: {:.02f}'.format(initial_psnr))
 
-y = sequential_torch(input_tensor)
+        for e in range(num_epochs):
+            i = 0
+            for input, targets in zip(train_input.split(self.batch_size),  
+                                      train_target.split(self.batch_size)):
 
-loss = criterion(y, target)
+                
+                output = self.model.forward(input)
+                loss = self.criterion.forward(output/255, targets/255)
+                grad_loss = self.criterion.backward()
+                self.model.backward(grad_loss)
+                #self.optimizer.step()
+                i+=1
+            
+            denoised = self.model.forward(test_input)
 
-# loss_val = loss(y, target)
+            if test_input!=None:    
+                psnr = self.psnr(denoised/255, test_target/255)                
+                print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
+                
+            #display denoised images 25 times during training
+            if vizualisation_flag and (e%(num_epochs//10)==0) and test_input!=None:
+                training_visualisation(denoised)
+            
+        
+    def predict(self, input_imgs):
+        #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
+        # or the loaded network .
+        #normalize image between 0 and 1
+        input_imgs_ = input_imgs/255
+        output = self.model.forward(input_imgs_)
 
-loss.backward()
+        # output should be an int between [0,255]
+        output = torch.clip(output*255, 0, 255)
+        return output
+    
+    def psnr(self, denoised, ground_truth):
+        #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
+        mse = torch.mean((denoised - ground_truth )** 2)
+        psnr = -10 * torch . log10 ( mse + 10** -8)
+        return psnr.item()
 
-
-
-torch.set_grad_enabled(True)
-
-
-
-# loss = MSE()
-
-# our_loss = loss.forward(input_tensor, target)
-# torch_loss = nn.MSELoss()
-
-# torch_loss_val = torch_loss(input_tensor, target)
-
-# print(our_loss-torch_loss_val)
-
-# relu = Relu()
-# sigmoid = Sigmoid()
-# sequential = Seq(relu,sigmoid)
-
-# sequential_torch = nn.Sequential(nn.ReLU(),nn.Sigmoid())
-
-
-# y = sequential.forward(input_tensor)
-
-# y_torch = sequential_torch(input_tensor)
-
-# print(y-y_torch)
-
-# y = sequential.backward(y)
-
-# # y_torch.backward(gradient)
-# print(y-torch.gradient(y_torch))
