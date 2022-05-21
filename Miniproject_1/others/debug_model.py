@@ -28,6 +28,7 @@ class NetBlock(nn.Module):
             elif self.stride==2:
                 self.convTrans1 = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2, output_padding = 1)
                 self.convSkipTrans = nn.ConvTranspose2d(input_channel, output_channel, kernel_size=(1,1), stride=(stride,stride), output_padding = 1)
+                #self.convSkipTrans = nn.Upsample(scale_factor=2, mode='bilinear')
          
         else:
             self.conv1 = nn.Conv2d(input_channel, output_channel, kernel_size=(kernel_size,kernel_size), stride=(stride,stride), padding = (kernel_size -1)//2)
@@ -144,6 +145,7 @@ class Model():
         ## instantiate model + optimizer + loss function + any other stuff you need
 
         self.lr = 0.002
+        self.nb_epoch = 100
         self.batch_size = 1000
 
         self.model = Net(self.batch_size)
@@ -156,23 +158,22 @@ class Model():
         full_path = os.path.join('Miniproject_1', 'bestmodel.pth')
         self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
 
-    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
+    def train(self, train_input, train_target, test_input, test_target, vizualisation_flag = False):
         #: train˙input : tensor of size (N, C, H, W) containing a noisy version of the images
         #: train˙target : tensor of size (N, C, H, W) containing another noisy version of the
         # same images , which only differs from the input by their noise .
 
         #If flag is true, plot the clean image and the noisy image
-        if vizualisation_flag and test_input!=None:
+        if vizualisation_flag:
             plt.ion()
             plt.show()
             training_visualisation(test_target)
             training_visualisation(test_input)
-            
-        if test_input!=None:
-            initial_psnr = self.psnr(test_input/255, test_target/255)
-            print('Psnr value between clean and noisy images is: {:.02f}'.format(initial_psnr))
 
-        for e in range(num_epochs):
+        initial_psnr = self.psnr(test_input, test_target)
+        print('Psnr value between clean and noisy images is: {:.02f}'.format(initial_psnr))
+
+        for e in range(self.nb_epoch):
             i = 0
             for input, targets in zip(train_input.split(self.batch_size),  
                                       train_target.split(self.batch_size)):
@@ -186,13 +187,12 @@ class Model():
             
             self.model.eval()
             denoised = self.predict(test_input)
+            psnr = self.psnr(denoised/255, test_target/255)
             
-            if test_input!=None:    
-                psnr = self.psnr(denoised/255, test_target/255)                
-                print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
-                
+            print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
+            
             #display denoised images 25 times during training
-            if vizualisation_flag and (e%(num_epochs//10)==0) and test_input!=None:
+            if vizualisation_flag and (e%(self.nb_epoch//10)==0):
                 training_visualisation(denoised)
 
     def predict(self, input_imgs):
@@ -219,7 +219,7 @@ def training_visualisation(imgs):
     nb_image = 4
     for a in range(nb_image):
         with torch.no_grad():     
-            b = imgs[a,:,:,:].int()
+            b = imgs[a,:,:,:]
             if torch.cuda.is_available():
                 b = b.to('cpu')
             b = b.permute(1,2,0)    
