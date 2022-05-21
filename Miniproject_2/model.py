@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torch import empty
 import matplotlib.pyplot as plt
-import numpy as np
+import math
 from torch.nn.functional import fold
 from torch.nn.functional import unfold
 
@@ -80,7 +80,7 @@ class Conv2d(Module):
         self.dilation = dilation
         self.output_channel = output_channel
         
-        k = np.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
+        k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         #initializing them
         self.weight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
         self.bias = torch.empty(output_channel).uniform_(-k,k)
@@ -108,7 +108,50 @@ class Conv2d(Module):
         #taking the deriative of "linear conv"
         return[]
     def param ( self ) :
-        return [self.weight, self.bias, self.gradweight, self.gradbias]
+        return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
+
+
+class Optimizer(Module):
+    def __init__(self, params, lr, momentum=0, dampening=0, weight_decay=0, nesterov=False, *, maximize=False):
+        self.momentum = momentum
+        self.params = params
+        self.dampening = dampening
+        self.weight_decay = weight_decay
+        self.nesterov = nesterov
+        self.maximize = maximize
+        self.lr = lr
+        self.prev_b = 0
+    def forward (self , x) :
+        for params in self.params:
+            for param in params:
+                g_t = param[1]
+                if self.weight_decay:
+                    g_t = g_t + self.weight_decay*param[0]
+                if self.momentum:
+                    if not self.prev_b: #if self.prev_b = 0
+                        b_t = g_t
+                    else:
+                        b_t = self.momentum*self.prev_b + (1-self.dampening)*g_t  #eta is learning rate
+                        self.prev_b = b_t
+                    if self.nesterov:
+                        g_t = g_t+self.momentum*b_t #help its g_t-1
+                    else:
+                        g_t = b_t
+                if self.maximize:
+                    param[0] = param[0] + self.lr*g_t
+                else:
+                    param[0] = param[0] - self.lr*g_t
+        return params
+
+    
+    def backward (self,y):
+        return []
+
+    def param ( self ) :
+        return [self.params]
+
+
+
 
 input_tensor = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
 target = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
