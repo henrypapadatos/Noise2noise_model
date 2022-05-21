@@ -112,14 +112,30 @@ class Conv2d(Module):
     def param ( self ) :
         return [self.weight, self.bias, self.gradweight, self.gradbias]
 
+def training_visualisation(imgs):
+    #Plot the 4 first images of imgs in a subplot way
+    fig=plt.figure()
+    nb_image = 4
+    for a in range(nb_image):
+        with torch.no_grad():     
+            b = imgs[a,:,:,:].int()
+            if torch.cuda.is_available():
+                b = b.to('cpu')
+            b = b.permute(1,2,0)    
+            ax = fig.add_subplot(1, nb_image, a+1)
+            subplot_title=("Image"+str(a))
+            ax.set_title(subplot_title)  
+            plt.imshow(b)
+    fig.tight_layout() 
+    plt.pause(0.001)
+    
 class Model():
     def __init__(self):
         self.lr = 0.002
         self.nb_epoch = 100
         self.batch_size = 1000
         self.model = Sequential()
-           
-        #self.optimizer = 
+        self.optimizer = None
         self.criterion = MSE()
     
     def load_pretrained_model(self):
@@ -127,12 +143,46 @@ class Model():
         #full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
         #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
         pass 
-    def train(self, train_input, train_target, test_input, test_target, vizualisation_flag = False):
-        pass
+    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
+        num_epochs = 10
+
+        if vizualisation_flag and test_input!=None:
+            plt.ion()
+            plt.show()
+            training_visualisation(test_target)
+            training_visualisation(test_input)
+        
+        if test_input!=None:
+            initial_psnr = self.psnr(test_input/255, test_target/255)
+            print('Psnr value between clean and noisy images is: {:.02f}'.format(initial_psnr))
+
+        for e in range(num_epochs):
+            i = 0
+            for input, targets in zip(train_input.split(self.batch_size),  
+                                      train_target.split(self.batch_size)):
+
+                
+                output = self.model.forward(input)
+                loss = self.criterion(output/255, targets/255)
+                loss.backward()
+                self.model.backward(input)
+                #self.optimizer.step()
+                i+=1
+            
+            denoised = self.model.forward(test_input)
+
+            if test_input!=None:    
+                psnr = self.psnr(denoised/255, test_target/255)                
+                print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
+                
+            #display denoised images 25 times during training
+            if vizualisation_flag and (e%(num_epochs//10)==0) and test_input!=None:
+                training_visualisation(denoised)
+            
+        
     def predict(self, input_imgs):
         #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network .
-        
         #normalize image between 0 and 1
         input_imgs_ = input_imgs/255
         output = self.model.forward(input_imgs_)
@@ -143,3 +193,4 @@ class Model():
         mse = torch.mean((denoised - ground_truth )** 2)
         psnr = -10 * torch . log10 ( mse + 10** -8)
         return psnr.item()
+
