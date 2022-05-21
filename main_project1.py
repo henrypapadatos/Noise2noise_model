@@ -4,8 +4,8 @@ Created on Thu May 19 16:15:21 2022
 
 @author: papad
 """
-
 import torch
+from torch import nn
 from Miniproject_1 import model
 
 

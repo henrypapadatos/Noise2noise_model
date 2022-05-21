@@ -56,11 +56,10 @@ class NetBlock(nn.Module):
 
 
 class Net(nn.Module):
-    def __init__(self, batch_size):
+    def __init__(self):
         super().__init__() #parent class refers to nn.module
         
         nb_channel = 32
-        self.batch_size = batch_size
         self.conv1 = nn.Conv2d(3, nb_channel, kernel_size=(3,3), stride=(1,1), padding = (3 -1)//2)
         self.conv5t = nn.ConvTranspose2d(nb_channel, 3, kernel_size=(3,3), stride=(1,1), padding = (3 -1)//2)
         self.Relu =  nn.ReLU()
@@ -148,7 +147,7 @@ class Model():
         self.nb_epoch = 100
         self.batch_size = 1000
 
-        self.model = Net(self.batch_size)
+        self.model = Net()
            
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.lr)
         self.criterion = nn.MSELoss()
