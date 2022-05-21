@@ -139,9 +139,15 @@ class Model():
         self.lr = 0.002
         self.nb_epoch = 100
         self.batch_size = 1000
-        self.model = Sequential()
         self.optimizer = None
         self.criterion = MSE()
+        self.Conv = Conv2d()
+        self.ReLU = Relu()
+        self.Sigmoid = Sigmoid()
+        #self.Upsampling = Upsampling()
+        #self.model = Sequential(self.Conv(3,3,3) , self.ReLU , self.Conv(3,3,3) , self.ReLU , self.Upsampling , self.ReLU , self.Upsampling , self.Sigmoid)
+        self.model = Sequential()
+
     
     def load_pretrained_model(self):
         ## This loads the parameters saved in bestmodel .pth into the model$
