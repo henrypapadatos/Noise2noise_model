@@ -67,12 +67,17 @@ class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are aski
 
 
 
-class ConvLayer(Module):
-    def __init__(self, input_channel, output_channel, kernel_size, stride):
+class Conv2d(Module):
+    def __init__(self, input_channel, output_channel, kernel_size, stride, padding, dilation):
         super().__init__()
 
-        self.stride = stride
+        if type(kernel_size) == int:
+            kernel_size = (kernel_size,kernel_size)
+
         self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.dilation = dilation
         
         k = np.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         self.weights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
@@ -82,17 +87,18 @@ class ConvLayer(Module):
         
     #initialize them here and gradients should at 0 
     def forward (self,x):
-        # unfold(x,) and liearize it to be able to use what we did in the exercise session
-        # unfold = torch.nn.Unfold(kernel_size = self.kernel_size)
-        # output = unfold(x)
-        # wxb = conv.weight.view(out ̇channels, -1) @ unfolded + conv.bias.view(1, -1, 1)
-        # actual = wxb.view(1, out ̇channels, x.shape[2] - kernel ̇size[0] + 1, x.shape[3] - kernel ̇size[1]+ 1)
- 
-        return 
+        h_in, w_in = x.shape[2:]
+        h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
+        w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
+        # unfold(x,) and linearize it to be able to use what we did in the exercise session
+        unfolded = torch.nn.functional.unfold(x, kernel_size = self.kernel_size)
+        out = unfolded.transpose(1, 2).matmul(self.weights.view(self.weights.size(0), -1).t()).transpose(1, 2) + self.bias.view(1,-1,1)
+        fold = torch.nn.functional.fold(out, (int(h_out), int(w_out)), kernel_size=(1,1))
+        return[]
 
     def backward (self,y):
         #taking the deriative of "linear conv"
-        return
+        return[]
     def param ( self ) :
         return [self.weights, self.bias, self.gradweights, self.gradbias]
 
