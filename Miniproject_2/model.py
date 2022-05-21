@@ -92,7 +92,7 @@ class Conv2d(Module):
     #initialize them here and gradients should at 0
 
     def conv (self,x):
-        weight2 = self.weight.copy
+        weight2 = self.weight.clone()
         h_in, w_in = x.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
@@ -102,8 +102,10 @@ class Conv2d(Module):
         return output
         
     def forward (self,x):
-        self.conv(x)
-        return[]
+        print("TYPE",x.type)
+        x_ = x
+        x_ = self.conv(x_)
+        return x_
 
     def backward (self,y):
         #taking the deriative of "linear conv"
