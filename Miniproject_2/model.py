@@ -68,7 +68,7 @@ class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are aski
 
 
 class Conv2d(Module):
-    def __init__(self, input_channel, output_channel, kernel_size, stride, padding, dilation):
+    def __init__(self, input_channel, output_channel, kernel_size=1, stride=1, padding=0, dilation=1):
         super().__init__()
 
         if type(kernel_size) == int:
@@ -78,6 +78,7 @@ class Conv2d(Module):
         self.stride = stride
         self.padding = padding
         self.dilation = dilation
+        self.output_channel = output_channel
         
         k = np.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         self.weights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
@@ -85,15 +86,19 @@ class Conv2d(Module):
         self.gradweights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1])*0
         self.gradbias = torch.empty(output_channel)*0
         
-    #initialize them here and gradients should at 0 
-    def forward (self,x):
+    #initialize them here and gradients should at 0
+
+    def conv (self,x):
         h_in, w_in = x.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
-        # unfold(x,) and linearize it to be able to use what we did in the exercise session
-        unfolded = torch.nn.functional.unfold(x, kernel_size = self.kernel_size)
+        unfolded = torch.nn.functional.unfold(x, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
         out = unfolded.transpose(1, 2).matmul(self.weights.view(self.weights.size(0), -1).t()).transpose(1, 2) + self.bias.view(1,-1,1)
-        fold = torch.nn.functional.fold(out, (int(h_out), int(w_out)), kernel_size=(1,1))
+        output = out.view(x.shape[0], output_channel, int(h_out), int(w_out))
+        return output
+        
+    def forward (self,x):
+        conv(self,x)
         return[]
 
     def backward (self,y):
