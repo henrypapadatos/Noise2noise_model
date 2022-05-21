@@ -71,7 +71,7 @@ class Sequential(Module): #MODIFY: supposed run sequentially all the stuff you a
 
 
 class Conv2d(Module):
-    def __init__(self, input_channel, output_channel, kernel_size, stride = 1, padding = 1, dilation= 1):
+    def __init__(self, input_channel, output_channel, kernel_size, stride = 1, padding = 0, dilation= 1):
         super().__init__()
 
         if type(kernel_size) == int:
@@ -84,7 +84,7 @@ class Conv2d(Module):
         self.output_channel = output_channel
         
         k = np.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
-        self.weights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
+        self.weight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
         self.bias = torch.empty(output_channel).uniform_(-k,k)
         self.gradweights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1])*0
         self.gradbias = torch.empty(output_channel)*0
@@ -96,19 +96,19 @@ class Conv2d(Module):
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
         unfolded = torch.nn.functional.unfold(x, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
-        out = unfolded.transpose(1, 2).matmul(self.weights.view(self.weights.size(0), -1).t()).transpose(1, 2) + self.bias.view(1,-1,1)
-        output = out.view(x.shape[0], output_channel, int(h_out), int(w_out))
+        out = unfolded.transpose(1, 2).matmul(self.weight.view(self.weight.size(0), -1).t()).transpose(1, 2) + self.bias.view(1,-1,1)
+        output = out.view(x.shape[0], self.output_channel, int(h_out), int(w_out))
         return output
         
     def forward (self,x):
-        conv(self,x)
+        self.conv(x)
         return[]
 
     def backward (self,y):
         #taking the deriative of "linear conv"
         return[]
     def param ( self ) :
-        return [self.weights, self.bias, self.gradweights, self.gradbias]
+        return [self.weight, self.bias, self.gradweights, self.gradbias]
 
 class Model():
     def __init__(self):
