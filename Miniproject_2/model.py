@@ -163,9 +163,9 @@ class Model():
 
                 
                 output = self.model.forward(input)
-                loss = self.criterion(output/255, targets/255)
-                loss.backward()
-                self.model.backward(input)
+                loss = self.criterion.forward(output/255, targets/255)
+                grad = loss.backward()
+                self.model.backward(grad)
                 #self.optimizer.step()
                 i+=1
             
@@ -186,6 +186,9 @@ class Model():
         #normalize image between 0 and 1
         input_imgs_ = input_imgs/255
         output = self.model.forward(input_imgs_)
+
+        # output should be an int between [0,255]
+        output = torch.clip(output*255, 0, 255)
         return output
     
     def psnr(self, denoised, ground_truth):
