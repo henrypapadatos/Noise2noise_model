@@ -160,9 +160,6 @@ class Model():
         #: train˙target : tensor of size (N, C, H, W) containing another noisy version of the
         # same images , which only differs from the input by their noise .
         
-        #REMOVE THIS BEFORE SUBMIT
-        num_epochs = 10
-
         #If flag is true, plot the clean image and the noisy image
         if vizualisation_flag and test_input!=None:
             plt.ion()
@@ -186,10 +183,10 @@ class Model():
                 self.optimizer.step()
                 i+=1
             
-            self.model.eval()
-            denoised = self.predict(test_input)
             
-            if test_input!=None:    
+            if test_input!=None:  
+                self.model.eval()
+                denoised = self.predict(test_input)
                 psnr = self.psnr(denoised/255, test_target/255)                
                 print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
                 
