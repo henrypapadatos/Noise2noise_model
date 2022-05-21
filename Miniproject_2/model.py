@@ -68,7 +68,7 @@ class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are aski
 
 
 class Conv2d(Module):
-    def __init__(self, input_channel, output_channel, kernel_size=1, stride=1, padding=0, dilation=1):
+    def __init__(self, input_channel, output_channel, kernel_size, stride = 1, padding = 0, dilation= 1):
         super().__init__()
 
         if type(kernel_size) == int:
@@ -89,7 +89,7 @@ class Conv2d(Module):
         
 
     def conv (self,x):
-        weight2 = self.weight.clone
+        weight2 = self.weight.clone()
         h_in, w_in = x.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
@@ -99,6 +99,7 @@ class Conv2d(Module):
         return output
         
     def forward (self,x):
+        print("TYPE",x.type)
         x_ = x
         x_ = self.conv(x_)
         return x_

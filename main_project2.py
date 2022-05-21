@@ -2,6 +2,9 @@
 import torch
 from torch import nn
 from Miniproject_2 import model
+import numpy as np
+
+'''
 
 input_tensor = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
 target = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
@@ -19,7 +22,7 @@ loss = criterion(y, target)
 loss.backward()
 with torch.no_grad():
     loss.grad
-
+'''
 
 # loss = MSE()
 

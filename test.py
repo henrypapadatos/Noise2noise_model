@@ -159,7 +159,7 @@ class Tests(unittest.TestCase):
         with self.subTest("Testing convolution"):
             Conv2d = model_module.Conv2d
             conv = Conv2d(3, 3, 3)
-            self.assertTrue(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias)))
+            print(self.assertTrue(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias))))
 
         with self.subTest("Testing sigmoid"):
             Sigmoid = model_module.Sigmoid
