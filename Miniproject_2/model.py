@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch.nn.functional import fold
 from torch.nn.functional import unfold
+import os
 
 
 class Module ( object ) :
@@ -36,7 +37,7 @@ class MSE(Module):
     def backward ( self , y, y_target) :
         return 2* (y-y_target).mean()
 
-class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are asking it to 
+class Sequential(Module): #MODIFY: supposed run sequentially all the stuff you are asking it to 
     def __init__(self, *type_layer):
         #super().__init__()
         self.type_layer = type_layer
@@ -45,22 +46,24 @@ class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are aski
 
     def forward (self,x):
         # for looop from start to begning
-        print("y",x)
+        #print("y",x)
+        x_ = x
         for layer in self.type_layer:
             #later we will have to call layer.param
-            x = layer.forward(x)
+            x_ = layer.forward(x_)
             #layer.forward(layer.param())
-            print("forward_layer",x)
-        return x
+            #print("forward_layer",x_)
+        return x_
     
     def backward (self,y, target):
-        print("y",y)
-        y = loss.backward(y, target)
+        #print("y",y)
+        y_ =y 
+        y_ = self.loss.backward(y_, target)
         for layer in reversed(self.type_layer):
-            y = layer.backward(y)
-            print("backward_layer",y)
+            y_ = layer.backward(y_)
+            #print("backward_layer",y_)
 
-        return y
+        return y_
 
     def param ( self ) :
         return []
@@ -68,7 +71,7 @@ class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are aski
 
 
 class Conv2d(Module):
-    def __init__(self, input_channel, output_channel, kernel_size, stride, padding, dilation):
+    def __init__(self, input_channel, output_channel, kernel_size, stride = 1, padding = 1, dilation= 1):
         super().__init__()
 
         if type(kernel_size) == int:
@@ -102,50 +105,37 @@ class Conv2d(Module):
     def param ( self ) :
         return [self.weights, self.bias, self.gradweights, self.gradbias]
 
-input_tensor = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
-target = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
+class Model():
+    def __init__(self):
+        ## instantiate model + optimizer + loss function + any other stuff you need
 
-sequential_torch = nn.Sequential(nn.ReLU(),nn.Sigmoid())
+        self.lr = 0.002
+        self.nb_epoch = 100
+        self.batch_size = 1000
 
-criterion = nn.MSELoss()
-
-y = sequential_torch(input_tensor)
-
-loss = criterion(y, target)
-
-# loss_val = loss(y, target)
-
-loss.backward()
-
-
-
-torch.set_grad_enabled(True)
-
-
-
-# loss = MSE()
-
-# our_loss = loss.forward(input_tensor, target)
-# torch_loss = nn.MSELoss()
-
-# torch_loss_val = torch_loss(input_tensor, target)
-
-# print(our_loss-torch_loss_val)
-
-# relu = Relu()
-# sigmoid = Sigmoid()
-# sequential = Seq(relu,sigmoid)
-
-# sequential_torch = nn.Sequential(nn.ReLU(),nn.Sigmoid())
-
-
-# y = sequential.forward(input_tensor)
-
-# y_torch = sequential_torch(input_tensor)
-
-# print(y-y_torch)
-
-# y = sequential.backward(y)
-
-# # y_torch.backward(gradient)
-# print(y-torch.gradient(y_torch))
+        self.model = Sequential()
+           
+        #self.optimizer = 
+        self.criterion = MSE()
+    
+    def load_pretrained_model(self):
+        ## This loads the parameters saved in bestmodel .pth into the model$
+        #full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
+        #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
+        pass 
+    def train(self, train_input, train_target, test_input, test_target, vizualisation_flag = False):
+        pass
+    def predict(self, input_imgs):
+        #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
+        # or the loaded network .
+        
+        #normalize image between 0 and 1
+        input_imgs_ = input_imgs/255
+        output = self.model.forward(input_imgs_)
+        return output
+    
+    def psnr(self, denoised, ground_truth):
+        #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
+        mse = torch.mean((denoised - ground_truth )** 2)
+        psnr = -10 * torch . log10 ( mse + 10** -8)
+        return psnr.item()
