@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch.nn.functional import fold
 from torch.nn.functional import unfold
+import os
 
 
 class Module ( object ) :
@@ -36,7 +37,7 @@ class MSE(Module):
     def backward ( self , y, y_target) :
         return 2* (y-y_target).mean()
 
-class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are asking it to 
+class Sequential(Module): #MODIFY: supposed run sequentially all the stuff you are asking it to 
     def __init__(self, *type_layer):
         #super().__init__()
         self.type_layer = type_layer
@@ -45,101 +46,104 @@ class Seq(Module): #MODIFY: supposed run sequentially all the stuff you are aski
 
     def forward (self,x):
         # for looop from start to begning
-        print("y",x)
+        #print("y",x)
+        x_ = x
         for layer in self.type_layer:
             #later we will have to call layer.param
-            x = layer.forward(x)
+            x_ = layer.forward(x_)
             #layer.forward(layer.param())
-            print("forward_layer",x)
-        return x
+            #print("forward_layer",x_)
+        return x_
     
     def backward (self,y, target):
-        print("y",y)
-        y = loss.backward(y, target)
+        #print("y",y)
+        y_ =y 
+        y_ = self.loss.backward(y_, target)
         for layer in reversed(self.type_layer):
-            y = layer.backward(y)
-            print("backward_layer",y)
+            y_ = layer.backward(y_)
+            #print("backward_layer",y_)
 
-        return y
+        return y_
 
     def param ( self ) :
         return []
 
 
 
-class ConvLayer(Module):
-    def __init__(self, input_channel, output_channel, kernel_size, stride):
+class Conv2d(Module):
+    def __init__(self, input_channel, output_channel, kernel_size, stride = 1, padding = 0, dilation= 1):
         super().__init__()
 
-        self.stride = stride
+        if type(kernel_size) == int:
+            kernel_size = (kernel_size,kernel_size)
+
         self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.dilation = dilation
+        self.output_channel = output_channel
         
         k = np.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
-        self.weights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
+        self.weight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
         self.bias = torch.empty(output_channel).uniform_(-k,k)
-        self.gradweights = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1])*0
+        self.gradweight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1])*0
         self.gradbias = torch.empty(output_channel)*0
         
-    #initialize them here and gradients should at 0 
+    #initialize them here and gradients should at 0
+
+    def conv (self,x):
+        weight2 = self.weight.clone()
+        h_in, w_in = x.shape[2:]
+        h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
+        w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
+        unfolded = torch.nn.functional.unfold(x, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        out = unfolded.transpose(1, 2).matmul(weight2.view(weight2.size(0), -1).t()).transpose(1, 2) + self.bias.view(1,-1,1)
+        output = out.view(x.shape[0], self.output_channel, int(h_out), int(w_out))
+        return output
+        
     def forward (self,x):
-        # unfold(x,) and liearize it to be able to use what we did in the exercise session
-        # unfold = torch.nn.Unfold(kernel_size = self.kernel_size)
-        # output = unfold(x)
-        # wxb = conv.weight.view(out ̇channels, -1) @ unfolded + conv.bias.view(1, -1, 1)
-        # actual = wxb.view(1, out ̇channels, x.shape[2] - kernel ̇size[0] + 1, x.shape[3] - kernel ̇size[1]+ 1)
- 
-        return 
+        print("TYPE",x.type)
+        x_ = x
+        x_ = self.conv(x_)
+        return x_
 
     def backward (self,y):
         #taking the deriative of "linear conv"
-        return
+        return[]
     def param ( self ) :
-        return [self.weights, self.bias, self.gradweights, self.gradbias]
+        return [self.weight, self.bias, self.gradweight, self.gradbias]
 
-input_tensor = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
-target = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
+class Model():
+    def __init__(self):
+        ## instantiate model + optimizer + loss function + any other stuff you need
 
-sequential_torch = nn.Sequential(nn.ReLU(),nn.Sigmoid())
+        self.lr = 0.002
+        self.nb_epoch = 100
+        self.batch_size = 1000
 
-criterion = nn.MSELoss()
-
-y = sequential_torch(input_tensor)
-
-loss = criterion(y, target)
-
-# loss_val = loss(y, target)
-
-loss.backward()
-
-
-
-torch.set_grad_enabled(True)
-
-
-
-# loss = MSE()
-
-# our_loss = loss.forward(input_tensor, target)
-# torch_loss = nn.MSELoss()
-
-# torch_loss_val = torch_loss(input_tensor, target)
-
-# print(our_loss-torch_loss_val)
-
-# relu = Relu()
-# sigmoid = Sigmoid()
-# sequential = Seq(relu,sigmoid)
-
-# sequential_torch = nn.Sequential(nn.ReLU(),nn.Sigmoid())
-
-
-# y = sequential.forward(input_tensor)
-
-# y_torch = sequential_torch(input_tensor)
-
-# print(y-y_torch)
-
-# y = sequential.backward(y)
-
-# # y_torch.backward(gradient)
-# print(y-torch.gradient(y_torch))
+        self.model = Sequential()
+           
+        #self.optimizer = 
+        self.criterion = MSE()
+    
+    def load_pretrained_model(self):
+        ## This loads the parameters saved in bestmodel .pth into the model$
+        #full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
+        #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
+        pass 
+    def train(self, train_input, train_target, test_input, test_target, vizualisation_flag = False):
+        pass
+    def predict(self, input_imgs):
+        #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
+        # or the loaded network .
+        
+        #normalize image between 0 and 1
+        input_imgs_ = input_imgs/255
+        output = self.model.forward(input_imgs_)
+        return output
+    
+    def psnr(self, denoised, ground_truth):
+        #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
+        mse = torch.mean((denoised - ground_truth )** 2)
+        psnr = -10 * torch . log10 ( mse + 10** -8)
+        return psnr.item()

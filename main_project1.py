@@ -7,6 +7,7 @@ Created on Thu May 19 16:15:21 2022
 import sys
 sys.path.append(r'C:\Users\papad\OneDrive\Documents\MA2\Deep_learning\Project\Noise2noise_model\Miniproject_1\others')
 import torch
+from torch import nn
 from Miniproject_1 import model
 import debug_model
 
