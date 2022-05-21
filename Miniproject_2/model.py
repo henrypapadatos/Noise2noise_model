@@ -177,6 +177,7 @@ class Model():
                 loss = self.criterion.forward(output/255, targets/255)
                 grad_loss = self.criterion.backward()
                 self.model.backward(grad_loss)
+                # add SGD
                 #self.optimizer.step()
                 i+=1
             
