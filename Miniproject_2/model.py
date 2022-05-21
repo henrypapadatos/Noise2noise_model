@@ -32,15 +32,16 @@ class Sigmoid(Module):
     
 class MSE(Module):
     def forward (self , x, x_target) :
-        return (x - x_target).pow(2).mean()
-    def backward ( self , y, y_target) :
-        return 2* (y-y_target).mean()
+        self.prediction = x 
+        self.target = x_target
+        return (self.prediction - self.target).pow(2).mean()
+    def backward ( self) :
+        return 2* (self.prediction-self.target).mean()
 
 class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you are asking it to 
     def __init__(self, *type_layer):
         #super().__init__()
         self.type_layer = type_layer
-        self.loss = MSE()
     # ex: 1 Sequential ( Conv( stride 2) , ReLU , Conv ( stride 2) , ReLU , Upsampling , ReLU , Upsampling , Sigmoid )
 
     def forward (self,x):
@@ -54,10 +55,9 @@ class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you 
             #print("forward_layer",x_)
         return x_
     
-    def backward (self,y, target):
+    def backward (self,y):
         #print("y",y)
         y_ = y 
-        y_ = self.loss.backward(y_, target)
         for layer in reversed(self.type_layer):
             y_ = layer.backward(y_)
             #print("backward_layer",y_)
@@ -66,7 +66,12 @@ class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you 
         return y_
 
     def param ( self ) :
-        return []
+
+        param = []
+        for layer in self.type_layer:
+            param.append(layer.param())
+
+        return param
 
 
 
@@ -164,8 +169,8 @@ class Model():
                 
                 output = self.model.forward(input)
                 loss = self.criterion.forward(output/255, targets/255)
-                grad = loss.backward()
-                self.model.backward(grad)
+                grad_loss = self.criterion.backward()
+                self.model.backward(grad_loss)
                 #self.optimizer.step()
                 i+=1
             
