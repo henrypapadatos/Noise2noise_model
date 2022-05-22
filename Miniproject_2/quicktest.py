@@ -24,8 +24,8 @@ seq = Sequential(conv, sigmoid)
 print(torch.allclose(seq.forward(x), F.conv2d(x, conv.weight, conv.bias).sigmoid()))
 '''
 Conv2d = model.Conv2d
-conv = Conv2d(3, 3, 3)
-print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias)))
+conv = Conv2d(3, 3, 3, padding=1)
+print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias, padding=1)))
 
 
 

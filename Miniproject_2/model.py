@@ -25,7 +25,7 @@ class Relu(Module):
         return (y>0)*1
 
 class Sigmoid(Module):
-    def forward (self , x) :
+    def forward (self, x) :
         return 1/(1+(-x).exp())
     def backward ( self , y) :
         return (-y).exp()/(1+(-y).exp()).pow(2)
@@ -88,6 +88,7 @@ class Conv2d(Module):
         self.padding = padding
         self.dilation = dilation
         self.output_channel = output_channel
+        self.input = None
         
         k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         #initializing them
@@ -97,26 +98,49 @@ class Conv2d(Module):
         self.gradbias = torch.empty(output_channel)*0
         
 
-    def conv (self,x):
-        weight2 = self.weight.clone()
-        x_ = x.clone()
-        x_ = x_.float()
-        h_in, w_in = x_.shape[2:]
+    def conv (self,x, weights=None, bias=None):
+        if weights==None:
+            weights = self.weight.clone()
+            bias = self.bias.clone()
+        elif bias==None:
+            bias=torch.empty(weights.size()[0])*0
+        h_in, w_in = x.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
-        unfolded = torch.nn.functional.unfold(x_, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
-        out = unfolded.transpose(1, 2).matmul(weight2.view(weight2.size(0), -1).t()).transpose(1, 2) + self.bias.view(1,-1,1)
-        output = out.view(x_.shape[0], self.output_channel, int(h_out), int(w_out))
+        unfolded = torch.nn.functional.unfold(x, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        out = unfolded.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2) + bias.view(1,-1,1)
+        output = out.view(x.shape[0], self.output_channel, int(h_out), int(w_out))
         return output
         
-    def forward (self,x):
-        x_ = x
-        x_ = self.conv(x_)
-        return x_
+    def forward (self,input):
+        self.input = input.clone()
+        output = self.conv(input.clone())
+        return output
 
     def backward (self,y):
         #taking the deriative of "linear conv"
+        output = y.clone()
+        
+        #compute de derivative of the output wrt the bias
+        dydbias = y.sum((0,2,3))
+        self.bias+=dydbias
+        
+        #compute de derivative of the output wrt the weights
+        output = output.permute(1, 2, 3, 0).reshape(self.output_channel, -1)
+        modified_input= torch.nn.functional.unfold(self.input.clone(), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        modified_input = modified_input.permute(1,2,0)
+        modified_input = modified_input.reshape(modified_input.size(0), -1)
+        #dy/dkernel = conv(self.input, y)
+        dydkernel = torch.matmul(output, modified_input.t())
+        
+        #dydkernel has the wrond dimension :(
+        #self.gradweight += dydkernel
+        
+        modified_weights = self.weight.clone().permute(1,2,3,0).reshape(self.output_channel, -1)
+        dydinput = torch.matmul(modified_weights.t(), output)
+        #dy/input 
         return[]
+    
     def param ( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
 
@@ -240,7 +264,7 @@ class Model():
                                       train_target.split(self.batch_size)):
 
                 
-                output = self.model.forward(input)
+                output = self.predict(input)
                 loss = self.criterion.forward(output/255, targets/255)
                 grad_loss = self.criterion.backward()
                 self.model.backward(grad_loss)
