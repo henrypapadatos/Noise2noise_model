@@ -179,6 +179,25 @@ class Optimizer(Module):
     def param ( self ) :
         return [self.params]
 
+class Upsampling(Module):
+    def __init__(self,scale):
+        self.scale = scale
+    def forward (self , x) :
+        [b,c_i,h_i,w_i] = x.shape
+        h_out = self.scale*h_i
+        w_out = self.scale*w_i
+        out = torch.empty(b,c_i,h_out,w_out)
+        for k in range(b):
+            for l in range(c_i):
+                for i in range(h_i):
+                    for j in range(w_i):
+                        out[k,l,i*scale:(i*scale+scale),j*scale:(j*scale+scale)] = x[k,l,i,j]
+        return[out]
+    def backward (self,y):
+        return[]
+    def param ( self ) :
+        return[]
+
 
 def training_visualisation(imgs):
     #Plot the 4 first images of imgs in a subplot way
