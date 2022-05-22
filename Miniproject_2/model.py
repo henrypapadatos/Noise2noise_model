@@ -87,6 +87,7 @@ class Conv2d(Module):
         self.padding = padding
         self.dilation = dilation
         self.output_channel = output_channel
+        self.input = None
         
         k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         #initializing them
@@ -106,13 +107,17 @@ class Conv2d(Module):
         output = out.view(x.shape[0], self.output_channel, int(h_out), int(w_out))
         return output
         
-    def forward (self,x):
-        x_ = x
-        x_ = self.conv(x_)
-        return x_
+    def forward (self,input):
+        self.input = input.clone()
+        output = self.conv(input.clone())
+        return output
 
     def backward (self,y):
         #taking the deriative of "linear conv"
+        #dy/dkernel = conv(self.input, y)
+        
+        # dydkernel = 
+        
         return[]
     def param ( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
