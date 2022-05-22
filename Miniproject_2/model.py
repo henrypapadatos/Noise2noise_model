@@ -25,18 +25,19 @@ class Relu(Module):
         return (y>0)
 
 class Sigmoid(Module):
-    def forward (self , x) :
+    def forward (self, x) :
         return 1/(1+(-x).exp())
     def backward ( self , y) :
         return (-y).exp()/(1+(-y).exp()).pow(2)
     
 class MSE(Module):
-    def forward (self , x, x_target) :
+    def forward (self, x, x_target) :
         self.prediction = x 
         self.target = x_target
         return (self.prediction - self.target).pow(2).mean()
-    def backward ( self) :
-        return 2* (self.prediction-self.target).mean()
+    def backward (self) :
+        batch_size = self.prediction.size()[0]
+        return 2* (self.prediction-self.target)/batch_size
 
 class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you are asking it to 
     def __init__(self, *type_layer):
