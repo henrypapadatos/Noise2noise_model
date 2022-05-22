@@ -54,16 +54,20 @@ with torch.no_grad():
 subset_train = 2
 subset_test = 10000
 
-noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
+noisy_imgs_1 , noisy_imgs_2 = torch.load(r'C:\Users\Usuario\OneDrive - epfl.ch\Documents\EPFL\Semester II\Deep Learning\Project\Noise2noise_model\train_data.pkl')
 
 noisy_imgs_1 = noisy_imgs_1[0:subset_train,:,:,:]
 noisy_imgs_2 = noisy_imgs_2[0:subset_train,:,:,:]
 
-test_imgs , clean_imgs = torch.load ('val_data.pkl')
+test_imgs , clean_imgs = torch.load (r'C:\Users\Usuario\OneDrive - epfl.ch\Documents\EPFL\Semester II\Deep Learning\Project\Noise2noise_model\val_data.pkl')
 test_imgs = test_imgs[0:subset_test,:,:,:]
 clean_imgs = clean_imgs[0:subset_test,:,:,:]
+input_rand = torch.randn(10, 20)
+target_rand = torch.randn(10, 20)
 
+test_input_rand = torch.randn(1, 20)
+test_target_rand = torch.randn(1, 20)
 
 model = model.Model()
 
-model.train(noisy_imgs_1, noisy_imgs_2)
+model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)

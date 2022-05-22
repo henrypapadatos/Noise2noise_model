@@ -19,16 +19,30 @@ class Module ( object ) :
         pass
 
 class Relu(Module):
+    def __init___(self):
+        self.input = None
     def forward ( self , x) :
-        return x*(x>0)
+        self.input = x.clone()
+        return self.input*((self.input>0).float())
     def backward ( self , y) :
-        return (y>0)*1
+        return y.mul((self.input>0).float())
+    def param ( self ) :
+        return []
 
 class Sigmoid(Module):
+    def __init__(self):
+        self.input = None
+
     def forward (self, x) :
-        return 1/(1+(-x).exp())
+        self.input = x.clone()
+        return 1/(1+(-self.input).exp())
+
     def backward ( self , y) :
-        return (-y).exp()/(1+(-y).exp()).pow(2)
+        
+        grad = (-self.input ).exp()/(1+(-self.input).exp()).pow(2)
+        return y.mul(grad)
+    def param(self):
+        return []
     
 class MSE(Module):
     def forward (self, x, x_target) :
@@ -38,6 +52,8 @@ class MSE(Module):
     def backward (self) :
         batch_size = self.prediction.size()[0]
         return 2* (self.prediction-self.target)/batch_size
+    def param ( self ) :
+        return []
 
 class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you are asking it to 
     def __init__(self, *type_layer):
@@ -66,13 +82,13 @@ class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you 
 
         return y_
 
-    def param ( self ) :
+    def param(self):
 
-        param = []
+        parameters = []
         for layer in self.type_layer:
-            param.append(layer.param())
+            parameters.append(layer.param())
 
-        return param
+        return parameters
 
 
 
@@ -171,10 +187,13 @@ class Optimizer(Module):
                         #g_t = g_t+self.momentum*b_t #help its g_t-1
                     #else:
                         #g_t = b_t
+
+                
                 if self.maximize:
-                    param[0] = param[0] + self.lr*g_t
+                    param[0].add_(self.lr * g_t)
                 else:
-                    param[0] = param[0] - self.lr*g_t
+                    param[0].sub_(self.lr * g_t)
+                    
 
     def param ( self ) :
         return [self.params]
@@ -229,15 +248,13 @@ class Model():
         self.criterion = MSE()
         self.Conv = Conv2d
         self.Linear = Linear
-        self.ReLU = Relu()
-        self.Sigmoid = Sigmoid()
         #self.Upsampling = Upsampling
         #self.model = Sequential(self.Conv(3,3,3) , self.ReLU , self.Conv(3,3,3) , self.ReLU , self.Upsampling , self.ReLU , self.Upsampling , self.Sigmoid)
         #self.Conv(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1 ), self.Sigmoid
         #self.model = Sequential(self.Conv(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1 ), self.ReLU)
 
         # Linear(25,25),ReLU(),Linear(25,25),ReLU(),Linear(25,2),Tanh()
-        self.model = Sequential(Linear(2,25), self.ReLU)
+        self.model = Sequential(Linear(20,25), Relu(), Linear(25,25),Relu(),Linear(25,20),Sigmoid())
 
     
     def load_pretrained_model(self):
@@ -272,9 +289,10 @@ class Model():
                 self.optimizer.step(self.model.param())
                 i+=1
             
-            denoised = self.model.forward(test_input)
+            
 
-            if test_input!=None:    
+            if test_input!=None:
+                denoised = self.model.forward(test_input)    
                 psnr = self.psnr(denoised/255, test_target/255)                
                 print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
                 
