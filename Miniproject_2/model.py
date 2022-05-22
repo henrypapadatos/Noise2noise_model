@@ -120,30 +120,30 @@ class Conv2d(Module):
 
 class Optimizer(Module):
     def __init__(self, params, lr, momentum=0, dampening=0, weight_decay=0, nesterov=False, *, maximize=False):
-        self.momentum = momentum
+        #self.momentum = momentum
         self.params = params
-        self.dampening = dampening
-        self.weight_decay = weight_decay
-        self.nesterov = nesterov
+        #self.dampening = dampening
+        #self.weight_decay = weight_decay
+        #self.nesterov = nesterov
         self.maximize = maximize
         self.lr = lr
-        self.prev_b = 0
+        #self.prev_b = 0
     def forward (self , x) :
         for params in self.params:
             for param in params:
                 g_t = param[1]
-                if self.weight_decay:
-                    g_t = g_t + self.weight_decay*param[0]
-                if self.momentum:
-                    if not self.prev_b: #if self.prev_b = 0
-                        b_t = g_t
-                    else:
-                        b_t = self.momentum*self.prev_b + (1-self.dampening)*g_t  #eta is learning rate
-                        self.prev_b = b_t
-                    if self.nesterov:
-                        g_t = g_t+self.momentum*b_t #help its g_t-1
-                    else:
-                        g_t = b_t
+                #if self.weight_decay:
+                    #g_t = g_t + self.weight_decay*param[0]
+                #if self.momentum:
+                    #if not self.prev_b: #if self.prev_b = 0
+                        #b_t = g_t
+                    #else:
+                        #b_t = self.momentum*self.prev_b + (1-self.dampening)*g_t  #eta is learning rate
+                        #self.prev_b = b_t
+                    #if self.nesterov:
+                        #g_t = g_t+self.momentum*b_t #help its g_t-1
+                    #else:
+                        #g_t = b_t
                 if self.maximize:
                     param[0] = param[0] + self.lr*g_t
                 else:
