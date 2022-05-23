@@ -9,7 +9,7 @@ import model
 import torch.nn.functional as F
 
 x = torch.randn(1, 3, 32, 32)
-print((x>0)*1)
+
 '''
 sigmoid = model.Sigmoid()
 print(torch.allclose(sigmoid.forward(x), torch.sigmoid(x)))
@@ -24,8 +24,8 @@ seq = Sequential(conv, sigmoid)
 print(torch.allclose(seq.forward(x), F.conv2d(x, conv.weight, conv.bias).sigmoid()))
 '''
 Conv2d = model.Conv2d
-conv = Conv2d(3, 3, 3, padding=1)
-print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias, padding=1)))
+conv = Conv2d(3, 3, 3, padding=1, dilation =2, stride =2)
+print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias, padding=1, dilation =2, stride =2)))
 
 
 

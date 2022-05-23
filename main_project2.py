@@ -6,7 +6,7 @@ import numpy as np
 import math
 from torch import empty
 from torch import set_grad_enabled
-set_grad_enabled(False)
+#set_grad_enabled(False)
 '''
 
 input_tensor = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
@@ -54,8 +54,8 @@ with torch.no_grad():
 # # y_torch.backward(gradient)
 # print(y-torch.gradient(y_torch))
 ################################################################ OUR DATASET ##########################################################
-subset_train = 2
-subset_test = 10000
+subset_train = 10000
+subset_test = 100
 
 noisy_imgs_1 , noisy_imgs_2 = torch.load(r'C:\Users\Usuario\OneDrive - epfl.ch\Documents\EPFL\Semester II\Deep Learning\Project\Noise2noise_model\train_data.pkl')
 
@@ -68,40 +68,41 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
 
 ################################################################ RANDOM DATASET FOR LINEAR #############################################
 
-input_rand = torch.randn(10, 20)
-target_rand = torch.randn(10, 20)
+# input_rand = torch.randn(10, 20)
+# target_rand = torch.randn(10, 20)
 
-test_input_rand = torch.randn(1, 20)
-test_target_rand = torch.randn(1, 20)
+# test_input_rand = torch.randn(1, 20)
+# test_target_rand = torch.randn(1, 20)
 
 ########################################################### DATASET LIKE IN EXERCISE SESSION FOR LINEAR #################################
 
-def reshapeLabel(label):
-    """'
-    Reshape 1-D [0,1,...] to 2-D [[1,-1],[-1,1],...].
-    """
-    n = label.size(0)
-    y = empty(n, 2)
-    y[:, 0] = 2 * (0.5 - label)
-    y[:, 1] = - y[:, 0]
-    return y.float()
+# def reshapeLabel(label):
+#     """'
+#     Reshape 1-D [0,1,...] to 2-D [[1,-1],[-1,1],...].
+#     """
+#     n = label.size(0)
+#     y = empty(n, 2)
+#     y[:, 0] = 2 * (0.5 - label)
+#     y[:, 1] = - y[:, 0]
+#     return y.float()
 
-def generate_disk_dataset(nb_points):
-    """
-    Inspired by the practical 5, this method generates points uniformly in the unit square, with label 1 if the points are in the disc centered at (0.5,0.5) of radius 1/sqrt(2pi), and 0 otherwise
-    """
-    input = empty(nb_points,2).uniform_(0,1)
-    label = input.sub(0.5).pow(2).sum(1).lt(1./2./math.pi).float()
-    target = reshapeLabel(label)
-    return input,target
+# def generate_disk_dataset(nb_points):
+#     """
+#     Inspired by the practical 5, this method generates points uniformly in the unit square, with label 1 if the points are in the disc centered at (0.5,0.5) of radius 1/sqrt(2pi), and 0 otherwise
+#     """
+#     input = empty(nb_points,2).uniform_(0,1)
+#     label = input.sub(0.5).pow(2).sum(1).lt(1./2./math.pi).float()
+#     target = reshapeLabel(label)
+#     return input,target
 
-# Generate train set and test set
-nb_points = 1000
-input_rand, target_rand = generate_disk_dataset(nb_points)
-test_input_rand ,test_target_rand = generate_disk_dataset(nb_points)
+# # Generate train set and test set
+# nb_points = 1000
+# input_rand, target_rand = generate_disk_dataset(nb_points)
+# test_input_rand ,test_target_rand = generate_disk_dataset(nb_points)
 
 ############################################################################################################################################
 
 model = model.Model()
 
-model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
+#model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
+model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs)

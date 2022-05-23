@@ -91,7 +91,6 @@ class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you 
         return parameters
 
 
-
 class Conv2d(Module):
     def __init__(self, input_channel, output_channel, kernel_size, stride = 1, padding = 0, dilation= 1):
         super().__init__()
@@ -104,7 +103,6 @@ class Conv2d(Module):
         self.padding = padding
         self.dilation = dilation
         self.output_channel = output_channel
-        self.input = None
         
         k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         #initializing them
@@ -126,14 +124,21 @@ class Conv2d(Module):
         unfolded = torch.nn.functional.unfold(x, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
         out = unfolded.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2) + bias.view(1,-1,1)
         output = out.view(x.shape[0], self.output_channel, int(h_out), int(w_out))
+        
         return output
         
-    def forward (self,input):
-        self.input = input.clone()
-        output = self.conv(input.clone())
-        return output
+    def forward (self,x):
+        self.input = x.clone().float()
+        '''
+        self.weight.requires_grad_(requires_grad = True)
+        self.input.requires_grad_(requires_grad = True)
+        self.bias.requires_grad_(requires_grad = True)
+        '''
+        self.output = self.conv(self.input)
+        return self.output
 
     def backward (self,y):
+        '''
         #taking the deriative of "linear conv"
         output = y.clone()
         
@@ -155,8 +160,17 @@ class Conv2d(Module):
         modified_weights = self.weight.clone().permute(1,2,3,0).reshape(self.output_channel, -1)
         dydinput = torch.matmul(modified_weights.t(), output)
         #dy/input 
-        return[]
-    
+        '''
+       # y_var = self.output.clone()
+        #var_y_ = Variable(y.data, requires_grad=True)
+        #torch.autograd.backward(self.output, torch.ones_like(self.output))
+        #self.gradweight = self.weight.grad
+        #self.gradbias = self.bias.grad
+        '''
+        (gradwrtinput,self.gradweight,self.gradbias)=torch.autograd.grad(outputs= self.output, inputs = (self.input,self.weight,self.bias), grad_outputs=torch.ones_like(self.output))
+        
+        return gradwrtinput
+        '''
     def param ( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
 
@@ -169,8 +183,9 @@ class Optimizer(Module):
         #self.nesterov = nesterov
         self.maximize = maximize
         self.lr = lr
+        self.params = None
         #self.prev_b = 0
-    def step (self, params) :
+    def step(self, params):
 
         for param_layer in params:
             for param in param_layer:
@@ -188,36 +203,52 @@ class Optimizer(Module):
                     #else:
                         #g_t = b_t
 
-                
+                 
                 if self.maximize:
                     param[0].add_(self.lr * g_t)
                 else:
                     param[0].sub_(self.lr * g_t)
-                    
+                
+                #After gradient step reanitialise that gradients of the wieghts.
+                param[1].mul_(0)
+        return params
 
     def param ( self ) :
-        return [self.params]
+        return self.params
 
-class Upsampling(Module):
+class UpsamplingNN(Module):
     def __init__(self,scale):
+        ##add inpput and output param + other to be able to do convolution
         self.scale = scale
-        self.conv2d = Conv2d()
+        #self.conv2d = Conv2d(c_i, c_i, kernel)
+
     def forward (self , x) :
-        x_ = x.clone()
-        [b,c_i,h_i,w_i] = x_.shape
-        h_out = self.scale*h_i
-        w_out = self.scale*w_i
-        out = torch.empty(b,c_i,h_out,w_out)
-        for k in range(b):
-            for l in range(c_i):
-                for i in range(h_i):
-                    for j in range(w_i):
-                        out[k,l,i*self.scale:(i*self.scale+self.scale),j*self.scale:(j*self.scale+self.scale)] = x_[k,l,i,j]
-        return self.conv2d.forward(out)
+        self.input = x.clone().float()
+        '''
+        self.input.requires_grad_(requires_grad = True)
+        '''
+        [b,c_i,h_i,w_i] = self.input.shape
+        u1 = torch.zeros(w_i,w_i*self.scale)
+        for i in range(w_i):
+            u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
+
+        u2 = torch.zeros(h_i,h_i*self.scale)
+        for j in range(h_i):
+            u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
+
+        u1 = torch.matmul(self.input,u1)
+        u1 = torch.transpose(u1,2,3)
+        out = torch.matmul(u1,u2)
+        self.output = torch.transpose(out,2,3)
+        #self.conv2d.forward(c_i, c_i, kernel_)
+        return  self.output 
+        
 
     def backward (self,y):
-        return self.conv2d(y, kernel_size = 1, stride = self.scale)
-
+        #return self.conv2d(y, kernel_size = 1, stride = self.scale)
+        '''
+        return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
+        '''
     def param ( self ) :
         return[]
 
@@ -243,26 +274,25 @@ class Model():
     def __init__(self):
         self.lr = 0.002
         self.nb_epoch = 100
-        self.batch_size = 1000
+        self.batch_size = 100
         #self.batch_size = 50
         self.optimizer = Optimizer(lr= self.lr)
         self.criterion = MSE()
-        self.Conv = Conv2d
-        self.Linear = Linear
-        #self.Upsampling = Upsampling
-        #self.model = Sequential(self.Conv(3,3,3) , self.ReLU , self.Conv(3,3,3) , self.ReLU , self.Upsampling , self.ReLU , self.Upsampling , self.Sigmoid)
-        #self.Conv(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1 ), self.Sigmoid
-        #self.model = Sequential(self.Conv(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1 ), self.ReLU)
-        self.model = Sequential(Linear(20,25), Relu(), Linear(25,25),Relu(),Linear(25,20),Sigmoid())
+        ### LINEAR ##
+        #self.model = Sequential(Linear(20,25), Relu(), Linear(25,25),Relu(),Linear(25,20),Sigmoid())
         #self.model = Sequential(Linear(2,25),Relu(),Linear(25,25),Relu(),Linear(25,25),Relu(),Linear(25,2),Sigmoid())
 
-    
+        ### CONV2D ##
+        #self.model = Sequential(Conv2d(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1), Sigmoid())
+        self.model = Sequential(Conv2d(input_channel = 3,output_channel = 32,kernel_size = 3, padding = 1, stride = 2),Relu(), Conv2d(32,3,kernel_size = 3, padding = 1, stride = 2), UpsamplingNN(scale = 2), Relu(), UpsamplingNN(scale = 2), Sigmoid())
+        
+
     def load_pretrained_model(self):
         ## This loads the parameters saved in bestmodel .pth into the model$
         #full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
         #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
         pass 
-    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
+    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = True):
         #num_epochs = 10
 
         if vizualisation_flag and test_input!=None:
@@ -286,13 +316,15 @@ class Model():
                 grad_loss = self.criterion.backward()
                 self.model.backward(grad_loss)
                 # add SGD here
-                self.optimizer.step(self.model.param())
+                with torch.no_grad():  
+                   params =  self.optimizer.step(self.model.param())
+                
+                
                 i+=1
-            
-            
 
             if test_input!=None:
-                denoised = self.model.forward(test_input)    
+                print("TESTING")
+                denoised = self.predict(test_input)    
                 psnr = self.psnr(denoised/255, test_target/255)                
                 print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
                 
@@ -305,7 +337,7 @@ class Model():
         #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network .
         #normalize image between 0 and 1
-        input_imgs_ = input_imgs/255
+        input_imgs_ = (input_imgs/255).float()
         output = self.model.forward(input_imgs_)
 
         # output should be an int between [0,255]
