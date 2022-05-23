@@ -103,6 +103,8 @@ class Conv2d(Module):
         self.padding = padding
         self.dilation = dilation
         self.output_channel = output_channel
+        self.input_channel = input_channel
+        self.input = None
         
         k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         #initializing them
@@ -111,6 +113,8 @@ class Conv2d(Module):
         self.gradweight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1])*0
         self.gradbias = torch.empty(output_channel)*0
         
+    def __call__(self, input):
+        return self.forward(input)
 
     def conv (self,x, weights=None, bias=None):
         if weights==None:
@@ -138,27 +142,42 @@ class Conv2d(Module):
         return self.output
 
     def backward (self,y):
-        '''
-        #taking the deriative of "linear conv"
         output = y.clone()
         
         #compute de derivative of the output wrt the bias
         dydbias = y.sum((0,2,3))
-        self.bias+=dydbias
+        self.gradbias+=dydbias
         
-        #compute de derivative of the output wrt the weights
-        output = output.permute(1, 2, 3, 0).reshape(self.output_channel, -1)
-        modified_input= torch.nn.functional.unfold(self.input.clone(), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
-        modified_input = modified_input.permute(1,2,0)
-        modified_input = modified_input.reshape(modified_input.size(0), -1)
-        #dy/dkernel = conv(self.input, y)
-        dydkernel = torch.matmul(output, modified_input.t())
+        #compute de derivative of the output wrt the weigths
+        unfolded = torch.nn.functional.unfold(self.input.clone(), kernel_size = output.shape[-2:], dilation = self.dilation, padding = self.padding, stride = self.stride)      
+        #out = unfolded.transpose(1, 2).matmul(part_output.view(part_output.size(0), -1).t()).transpose(1, 2)  
+        out = output.reshape(self.output_channel, -1).matmul(unfolded.view(1,-1, self.input_channel*unfolded.shape[-1]))
+        dydkernel = out.view(self.weight.size())
+        self.gradweight+=dydkernel
+        
+        # comput the derivative of the output wrt the input
+        output = y.clone()
+        padding = (output.size(2)-1+self.padding,output.size(3)-1+self.padding)
+        kernel = self.weight.clone().flip((2,3)).transpose(0,1)
+        unfolded = torch.nn.functional.unfold(kernel, kernel_size = output.shape[-2:], dilation = self.dilation, padding = padding, stride = self.stride)      
+        #out = unfolded.transpose(1, 2).matmul(part_output.view(part_output.size(0), -1).t()).transpose(1, 2)  
+        out = output.reshape(output.size(0), -1).matmul(unfolded)
+        dydinput = out.view(self.input.size())
+        
+        
+        # #compute de derivative of the output wrt the weights
+        # output = output.permute(1, 2, 3, 0).reshape(self.output_channel, -1)
+        # modified_input= torch.nn.functional.unfold(self.input.clone(), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        # modified_input = modified_input.permute(1,2,0)
+        # modified_input = modified_input.reshape(modified_input.size(0), -1)
+        # #dy/dkernel = conv(self.input, y)
+        # dydkernel = torch.matmul(output, modified_input.t())
         
         #dydkernel has the wrond dimension :(
         #self.gradweight += dydkernel
         
-        modified_weights = self.weight.clone().permute(1,2,3,0).reshape(self.output_channel, -1)
-        dydinput = torch.matmul(modified_weights.t(), output)
+        # modified_weights = self.weight.clone().permute(1,2,3,0).reshape(self.output_channel, -1)
+        # dydinput = torch.matmul(modified_weights.t(), output)
         #dy/input 
         '''
        # y_var = self.output.clone()
@@ -171,6 +190,9 @@ class Conv2d(Module):
         
         return gradwrtinput
         '''
+        
+        return dydinput
+    
     def param ( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
 
@@ -249,6 +271,8 @@ class UpsamplingNN(Module):
         '''
         return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
         '''
+        return self.conv2d(y, kernel_size = 1, stride = self.scale)
+
     def param ( self ) :
         return[]
 
