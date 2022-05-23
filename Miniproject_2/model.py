@@ -38,7 +38,7 @@ class Sigmoid(Module):
         return 1/(1+(-self.input).exp())
 
     def backward ( self , y) :
-        
+
         grad = (-self.input ).exp()/(1+(-self.input).exp()).pow(2)
         return y.mul(grad)
     def param(self):
@@ -244,6 +244,7 @@ class Model():
         self.lr = 0.002
         self.nb_epoch = 100
         self.batch_size = 1000
+        #self.batch_size = 50
         self.optimizer = Optimizer(lr= self.lr)
         self.criterion = MSE()
         self.Conv = Conv2d
@@ -252,9 +253,8 @@ class Model():
         #self.model = Sequential(self.Conv(3,3,3) , self.ReLU , self.Conv(3,3,3) , self.ReLU , self.Upsampling , self.ReLU , self.Upsampling , self.Sigmoid)
         #self.Conv(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1 ), self.Sigmoid
         #self.model = Sequential(self.Conv(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1 ), self.ReLU)
-
-        # Linear(25,25),ReLU(),Linear(25,25),ReLU(),Linear(25,2),Tanh()
         self.model = Sequential(Linear(20,25), Relu(), Linear(25,25),Relu(),Linear(25,20),Sigmoid())
+        #self.model = Sequential(Linear(2,25),Relu(),Linear(25,25),Relu(),Linear(25,25),Relu(),Linear(25,2),Sigmoid())
 
     
     def load_pretrained_model(self):
@@ -263,7 +263,7 @@ class Model():
         #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
         pass 
     def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
-        num_epochs = 10
+        #num_epochs = 10
 
         if vizualisation_flag and test_input!=None:
             plt.ion()
