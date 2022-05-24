@@ -271,10 +271,10 @@ class UpsamplingNN(Module):
         self.y = y.clone().float()
         v1 = self.u1.t()
         v2 = self.u2.t()
+        self.y = torch.transpose(self.y,2,3)
         v2_y = torch.matmul(self.y,v2)
         v2_y_t = torch.transpose(v2_y,2,3)
-        out = torch.matmul(v2_y_t,v1)
-        self.output2 = torch.transpose(out,2,3)
+        self.output2 = torch.matmul(v2_y_t,v1)
         
         '''
         return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
