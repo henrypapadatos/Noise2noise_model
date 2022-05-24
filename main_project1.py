@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu May 19 16:15:21 2022
 
-@author: papad
-"""
 import sys
 sys.path.append(r'C:\Users\papad\OneDrive\Documents\MA2\Deep_learning\Project\Noise2noise_model\Miniproject_1\others')
 import torch
 from torch import nn
 from Miniproject_1 import model
-import debug_model
 
 
 subset_train = 50000
@@ -41,9 +36,3 @@ noise2noise.load_pretrained_model()
 output = noise2noise.predict(noisy_imgs_1[0:2])
 print('here')
 model.display_img(output[0])
-# image_number = 0
-# img = test_imgs[image_number,:,:,:]
-# display_img(img)
-# predicted = noise2noise.predict(img.unsqueeze(0))
-# display_img(predicted.squeeze())
-# plt.show
