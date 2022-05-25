@@ -55,15 +55,15 @@ with torch.no_grad():
 # # y_torch.backward(gradient)
 # print(y-torch.gradient(y_torch))
 ################################################################ OUR DATASET ##########################################################
-subset_train = 10000
+subset_train = 1000
 subset_test = 100
 
-noisy_imgs_1 , noisy_imgs_2 = torch.load(r'C:\Users\Usuario\OneDrive - epfl.ch\Documents\EPFL\Semester II\Deep Learning\Project\Noise2noise_model\train_data.pkl')
+noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
 
 noisy_imgs_1 = noisy_imgs_1[0:subset_train,:,:,:]
 noisy_imgs_2 = noisy_imgs_2[0:subset_train,:,:,:]
 
-test_imgs , clean_imgs = torch.load (r'C:\Users\Usuario\OneDrive - epfl.ch\Documents\EPFL\Semester II\Deep Learning\Project\Noise2noise_model\val_data.pkl')
+test_imgs , clean_imgs = torch.load ('val_data.pkl')
 test_imgs = test_imgs[0:subset_test,:,:,:]
 clean_imgs = clean_imgs[0:subset_test,:,:,:]
 
@@ -100,10 +100,49 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
 # nb_points = 1000
 # input_rand, target_rand = generate_disk_dataset(nb_points)
 # test_input_rand ,test_target_rand = generate_disk_dataset(nb_points)
+##############################################################################################################"""
+def psnr(denoised, ground_truth):
+    #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
+    mse = torch.mean((denoised - ground_truth )** 2)
+    psnr = -10 * torch . log10 ( mse + 10** -8)
+    return psnr.item()
 
+model = nn.Sequential(nn.Conv2d(3, 16, kernel_size=(3,3), stride=(1,1), padding=1),
+                      nn.ReLU(),
+                      nn.Conv2d(16, 16, kernel_size=(3,3), stride=(1,1), padding=1),
+                      nn.ReLU(),
+                      nn.Conv2d(16, 3, kernel_size=(3,3), stride=(1,1), padding=1),
+                      nn.Sigmoid()
+                      )
+
+lr = 0.001
+batch_size=500
+nb_epoch=100
+
+optimizer = torch.optim.SGD(model.parameters(), lr)
+criterion = nn.MSELoss()
+  
+for e in range(nb_epoch):
+    for input, targets in zip(noisy_imgs_1.split(batch_size),  
+                              noisy_imgs_2.split(batch_size)):
+        output = model((input/255).float())
+        loss = criterion(output/255, targets/255)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+    psnr=psnr(model(test_imgs), clean_imgs)
+    print('Nb of epoch: {:d}    psnr: {:.02f}    loss: {:.08f}'.format(e, psnr, loss))
+
+        
+
+
+
+            
+            
 ############################################################################################################################################
-random.seed(10)
-model = model.Model()
 
-#model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
-model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs)
+# model = model.Model()
+
+# # model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
+# model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs)
