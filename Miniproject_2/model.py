@@ -23,9 +23,9 @@ class Relu(Module):
         self.input = None
     def forward ( self , x) :
         self.input = x.clone()
-        return self.input*((self.input>0).float())
+        return self.input.mul((self.input>0))
     def backward ( self , y) :
-        return y.mul((self.input>0).float())
+        return y.mul(self.input>0)
     def param ( self ) :
         return []
 
@@ -46,12 +46,13 @@ class Sigmoid(Module):
     
 class MSE(Module):
     def forward (self, x, x_target) :
-        self.prediction = x 
-        self.target = x_target
+        
+        self.prediction = x.clone()
+        self.target = x_target.clone()
         return (self.prediction - self.target).pow(2).mean()
+        #return torch.rand(100,4,32,32)
     def backward (self) :
-        batch_size = self.prediction.size()[0]
-        return 2* (self.prediction-self.target)/batch_size
+        return 2* (self.prediction-self.target).mean()#/torch.prod(torch.tensor(self.prediction.size()))       
     def param ( self ) :
         return []
 
@@ -64,7 +65,7 @@ class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you 
     def forward (self,x):
         # for looop from start to begning
         #print("y",x)
-        x_ = x
+        x_ = x.clone()
         for layer in self.type_layer:
             #later we will have to call layer.param
             x_ = layer.forward(x_)
@@ -74,7 +75,7 @@ class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you 
     
     def backward (self,y):
         #print("y",y)
-        y_ = y 
+        y_ = y.clone()
         for layer in reversed(self.type_layer):
             y_ = layer.backward(y_)
             #print("backward_layer",y_)
@@ -106,33 +107,48 @@ class Conv2d(Module):
         self.input_channel = input_channel
         self.input = None
         
-        k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
+       
         #initializing them
-        self.weight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).uniform_(-k,k)
-        self.bias = torch.empty(output_channel).uniform_(-k,k)
-        self.gradweight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1])*0
-        self.gradbias = torch.empty(output_channel)*0
+        '''
+        std = 1. / math.sqrt(self.weights.size(0))
+        self.weights.normal_(-std,std)
+        
+        '''
+        self.weight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0)
+        k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
+        self.weight.uniform_(-k,k).nan_to_num_()
+        #self.weight = self.weight.fill_(0).uniform_(-k,k)
+        self.bias = torch.empty(output_channel).fill_(0)
+        self.bias.uniform_(-k,k).nan_to_num_()
+        #self.bias = self.bias.fill_(0).uniform_(-k,k)
+        self.gradweight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0).nan_to_num_()
+        self.gradbias = torch.empty(output_channel).fill_(0).nan_to_num_()
         
     def __call__(self, input):
         return self.forward(input)
 
     def conv (self,x, weights=None, bias=None):
+        x_ = x.clone()
+
         if weights==None:
             weights = self.weight.clone()
             bias = self.bias.clone()
         elif bias==None:
-            bias=torch.empty(weights.size()[0])*0
-        h_in, w_in = x.shape[2:]
+            bias= torch.empty(weights.size()[0]).fill_(0).nan_to_num()
+
+        h_in, w_in = x_.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
-        unfolded = torch.nn.functional.unfold(x, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        unfolded = torch.nn.functional.unfold(x_, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        self.unfolded_x = unfolded.clone()
         out = unfolded.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2) + bias.view(1,-1,1)
-        output = out.view(x.shape[0], self.output_channel, int(h_out), int(w_out))
+        output = out.view(x_.shape[0], self.output_channel, int(h_out), int(w_out))
         
         return output
         
     def forward (self,x):
-        self.input = x.clone().float()
+        self.input = x.clone()
+    
         '''
         self.weight.requires_grad_(requires_grad = True)
         self.input.requires_grad_(requires_grad = True)
@@ -142,12 +158,26 @@ class Conv2d(Module):
         return self.output
 
     def backward (self,y):
-        output = y.clone()
         
+        Y = y.clone()
+        #print(" MAX Y", Y.abs().max())
         #compute de derivative of the output wrt the bias
-        dydbias = y.sum((0,2,3))
-        self.gradbias+=dydbias
-        
+        dydbias = Y.sum((2,3))
+        self.gradbias+=dydbias.mean(0)
+        #print(" MAX gradbias", self.gradbias.abs().max())
+
+        lin_Y = Y.view(Y.shape[0],self.output_channel,Y.shape[2]*Y.shape[2])
+        lin_weights_grad = lin_Y.matmul(self.unfolded_x.transpose(1,2)).mean(0)
+        self.gradweight += lin_weights_grad.view(lin_weights_grad.size(0),self.input_channel, self.kernel_size[0],self.kernel_size[0])
+        #print(" MAX gradweight",self.gradweight.abs().max())
+        # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
+        lin_w = self.weight.view(self.weight.size(0), -1)
+        lin_grad_wrt_input = lin_w.transpose(0,1).matmul(lin_Y)
+        grad_wrt_input = torch.nn.functional.fold(lin_grad_wrt_input,output_size=(self.input.shape[-1],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        #print(" MAX grad_wrt_input", grad_wrt_input.abs().max())
+
+        return grad_wrt_input
+        '''
         #compute de derivative of the output wrt the weigths
         unfolded = torch.nn.functional.unfold(self.input.clone(), kernel_size = output.shape[-2:], dilation = self.dilation, padding = self.padding, stride = self.stride)      
         #out = unfolded.transpose(1, 2).matmul(part_output.view(part_output.size(0), -1).t()).transpose(1, 2)  
@@ -163,8 +193,9 @@ class Conv2d(Module):
         #out = unfolded.transpose(1, 2).matmul(part_output.view(part_output.size(0), -1).t()).transpose(1, 2)  
         out = output.reshape(output.size(0), -1).matmul(unfolded)
         dydinput = out.view(self.input.size())
-        
-        
+
+        return dydinput
+        '''
         # #compute de derivative of the output wrt the weights
         # output = output.permute(1, 2, 3, 0).reshape(self.output_channel, -1)
         # modified_input= torch.nn.functional.unfold(self.input.clone(), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
@@ -179,8 +210,10 @@ class Conv2d(Module):
         # modified_weights = self.weight.clone().permute(1,2,3,0).reshape(self.output_channel, -1)
         # dydinput = torch.matmul(modified_weights.t(), output)
         #dy/input 
-        '''
+        
        # y_var = self.output.clone()
+
+
         #var_y_ = Variable(y.data, requires_grad=True)
         #torch.autograd.backward(self.output, torch.ones_like(self.output))
         #self.gradweight = self.weight.grad
@@ -190,8 +223,6 @@ class Conv2d(Module):
         
         return gradwrtinput
         '''
-        
-        return dydinput
     
     def param ( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
@@ -239,17 +270,14 @@ class Optimizer(Module):
         return self.params
 
 class UpsamplingNN(Module):
-    def __init__(self,scale):
+    def __init__(self,scale, input_size, output_size,kernel_size = 1):
         ##add inpput and output param + other to be able to do convolution
         self.scale = scale
-        #self.conv2d = Conv2d(c_i, c_i, kernel)
+        self.conv2d = Conv2d(input_size, output_size, kernel_size, stride = self.scale)
 
     def forward (self , x) :
-        self.input = x.clone().float()
-        '''
-        self.input.requires_grad_(requires_grad = True)
-        '''
-        [b,c_i,h_i,w_i] = self.input.shape
+        x_ = x.clone()
+        [b,c_i,h_i,w_i] = x_.shape
         u1 = torch.zeros(w_i,w_i*self.scale)
         for i in range(w_i):
             u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
@@ -258,20 +286,32 @@ class UpsamplingNN(Module):
         for j in range(h_i):
             u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
 
-        u1 = torch.matmul(self.input,u1)
+        u1 = torch.matmul(x_,u1)
         u1 = torch.transpose(u1,2,3)
         out = torch.matmul(u1,u2)
-        self.output = torch.transpose(out,2,3)
-        #self.conv2d.forward(c_i, c_i, kernel_)
-        return  self.output 
-        
+        out = torch.transpose(out,2,3)
+
+        return out
 
     def backward (self,y):
-        #return self.conv2d(y, kernel_size = 1, stride = self.scale)
+        
+        #return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
+        '''
+        Y = y.clone()
+        v1 = self.u1.t()
+        v2 = self.u2.t()
+        v2_y = torch.matmul(Y,v2)
+        v2_y_t = torch.transpose(v2_y,2,3)
+        out = torch.matmul(v2_y_t,v1)
+        output2 = torch.transpose(out,2,3)
+        #self.conv2d(y, kernel_size = 1, stride = self.scale)
+        return output2
+        '''
         '''
         return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
         '''
-        return self.conv2d(y, kernel_size = 1, stride = self.scale)
+        
+        return self.conv2d(y)
 
     def param ( self ) :
         return[]
@@ -296,9 +336,9 @@ def training_visualisation(imgs):
     
 class Model():
     def __init__(self):
-        self.lr = 0.002
+        self.lr = 0.003 #0.001 best
         self.nb_epoch = 100
-        self.batch_size = 100
+        self.batch_size = 500
         #self.batch_size = 50
         self.optimizer = Optimizer(lr= self.lr)
         self.criterion = MSE()
@@ -308,15 +348,16 @@ class Model():
 
         ### CONV2D ##
         #self.model = Sequential(Conv2d(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1), Sigmoid())
-        self.model = Sequential(Conv2d(input_channel = 3,output_channel = 32,kernel_size = 3, padding = 1, stride = 2),Relu(), Conv2d(32,3,kernel_size = 3, padding = 1, stride = 2), UpsamplingNN(scale = 2), Relu(), UpsamplingNN(scale = 2), Sigmoid())
-        
+        #self.model = Sequential(Conv2d(input_channel = 3,output_channel = 4,kernel_size = 5, padding = 2, stride = 1))
+        #self.model = Sequential(Conv2d(input_channel = 3,output_channel = 32,kernel_size = 3, padding = 1, stride = 2),Relu(), Conv2d(32,3,kernel_size = 3, padding = 1, stride = 2), UpsamplingNN(scale = 2, input_size = 3, output_size = 3, kernel_size = 1), Relu(), UpsamplingNN(scale = 2, input_size = 3, output_size = 3, kernel_size = 1), Sigmoid())
+        self.model = Sequential(Conv2d(input_channel = 3,output_channel = 16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,3,kernel_size = 3, padding = 1, stride = 1),Sigmoid())
 
     def load_pretrained_model(self):
         ## This loads the parameters saved in bestmodel .pth into the model$
         #full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
         #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
         pass 
-    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = True):
+    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
         #num_epochs = 10
 
         if vizualisation_flag and test_input!=None:
@@ -330,7 +371,7 @@ class Model():
             print('Psnr value between clean and noisy images is: {:.02f}'.format(initial_psnr))
 
         for e in range(num_epochs):
-            i = 0
+            
             for input, targets in zip(train_input.split(self.batch_size),  
                                       train_target.split(self.batch_size)):
 
@@ -340,17 +381,14 @@ class Model():
                 grad_loss = self.criterion.backward()
                 self.model.backward(grad_loss)
                 # add SGD here
-                with torch.no_grad():  
-                   params =  self.optimizer.step(self.model.param())
-                
-                
-                i+=1
+                #with torch.no_grad():  
+                params =  self.optimizer.step(self.model.param())
+
 
             if test_input!=None:
-                print("TESTING")
                 denoised = self.predict(test_input)    
                 psnr = self.psnr(denoised/255, test_target/255)                
-                print('Nb of epoch: {:d}    psnr: {:.02f}'.format(e, psnr))
+                print('Nb of epoch: {:d}    psnr: {:.04f}    loss: {:.08f}'.format(e, psnr, loss))
                 
             #display denoised images 25 times during training
             if vizualisation_flag and (e%(num_epochs//10)==0) and test_input!=None:
@@ -384,12 +422,12 @@ class Linear(Module):
         self.input_features = input_features
         self.output_features = output_features
         
-        self.weights = empty(input_features,output_features)
-        self.weights_grad = empty(input_features,output_features)
+        self.weights = empty(input_features,output_features).nan_to_num()
+        self.weights_grad = empty(input_features,output_features).nan_to_num()
         
         if bias :
-            self.bias = empty(output_features)
-            self.bias_grad = empty(output_features)
+            self.bias = empty(output_features).nan_to_num()
+            self.bias_grad = empty(output_features).nan_to_num()
         else : 
             self.bias = None
             self.bias_grad = None
@@ -432,7 +470,8 @@ class Linear(Module):
         # The sum is to take for account the possibility that we process our inputs by batches of size greater than 1, we sum the gradient contributions of independent points
         if self.bias is not None : 
                 self.bias_grad = gradwrtoutput.t().sum(1)
-            
+        
+
         # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
         return gradwrtoutput.matmul(self.weights.t())
     

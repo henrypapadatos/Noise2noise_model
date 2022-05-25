@@ -6,6 +6,7 @@ import numpy as np
 import math
 from torch import empty
 from torch import set_grad_enabled
+import random
 #set_grad_enabled(False)
 '''
 
@@ -101,7 +102,7 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
 # test_input_rand ,test_target_rand = generate_disk_dataset(nb_points)
 
 ############################################################################################################################################
-
+random.seed(10)
 model = model.Model()
 
 #model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
