@@ -179,7 +179,7 @@ class Conv2d(Module):
         # modified_weights = self.weight.clone().permute(1,2,3,0).reshape(self.output_channel, -1)
         # dydinput = torch.matmul(modified_weights.t(), output)
         #dy/input 
-        '''
+        
        # y_var = self.output.clone()
         #var_y_ = Variable(y.data, requires_grad=True)
         #torch.autograd.backward(self.output, torch.ones_like(self.output))
@@ -253,14 +253,14 @@ class UpsamplingNN(Module):
         u1 = torch.zeros(w_i,w_i*self.scale)
         for i in range(w_i):
             u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
-
+        self.u1 = u1
         u2 = torch.zeros(h_i,h_i*self.scale)
         for j in range(h_i):
             u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
-
-        u1 = torch.matmul(self.input,u1)
-        u1 = torch.transpose(u1,2,3)
-        out = torch.matmul(u1,u2)
+        self.u2 = u2
+        u1_i = torch.matmul(self.input,u1)
+        u1_i_t = torch.transpose(u1_i,2,3)
+        out = torch.matmul(u1_i_t,u2)
         self.output = torch.transpose(out,2,3)
         #self.conv2d.forward(c_i, c_i, kernel_)
         return  self.output 
@@ -268,9 +268,18 @@ class UpsamplingNN(Module):
 
     def backward (self,y):
         #return self.conv2d(y, kernel_size = 1, stride = self.scale)
+        self.y = y.clone().float()
+        v1 = self.u1.t()
+        v2 = self.u2.t()
+        self.y = torch.transpose(self.y,2,3)
+        v2_y = torch.matmul(self.y,v2)
+        v2_y_t = torch.transpose(v2_y,2,3)
+        self.output2 = torch.matmul(v2_y_t,v1)
+        
         '''
         return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
         '''
+        
         return self.conv2d(y, kernel_size = 1, stride = self.scale)
 
     def param ( self ) :
