@@ -281,32 +281,9 @@ class UpsamplingNN(Module):
         u1 = torch.zeros(w_i,w_i*self.scale)
         for i in range(w_i):
             u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
-
         u2 = torch.zeros(h_i,h_i*self.scale)
         for j in range(h_i):
             u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
-
-        u1 = torch.matmul(x_,u1)
-        u1 = torch.transpose(u1,2,3)
-        out = torch.matmul(u1,u2)
-        out = torch.transpose(out,2,3)
-
-        return out
-
-    def backward (self,y):
-        
-        #return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
-        '''
-        Y = y.clone()
-        v1 = self.u1.t()
-        v2 = self.u2.t()
-        v2_y = torch.matmul(Y,v2)
-        v2_y_t = torch.transpose(v2_y,2,3)
-        out = torch.matmul(v2_y_t,v1)
-        output2 = torch.transpose(out,2,3)
-        #self.conv2d(y, kernel_size = 1, stride = self.scale)
-        return output2
-        '''
         '''
         return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
         '''

@@ -3,17 +3,7 @@ from torch import nn
 import matplotlib.pyplot as plt
 import os
 
-class PrintLayer(nn.Module):
-    def __init__(self):
-        super(PrintLayer, self).__init__()
     
-    def forward(self, x):
-        # Do your print / debug stuff here
-        print(x.shape)
-        return x
-    
-    
-
 class NetBlock(nn.Module):
     def __init__(self, input_channel, output_channel, kernel_size, stride, transpose_flag):
         super().__init__()
@@ -56,85 +46,52 @@ class NetBlock(nn.Module):
 
 class Net(nn.Module):
     def __init__(self):
-        super().__init__() #parent class refers to nn.module
+        super().__init__()
         
         nb_channel = 32
+        
         self.conv1 = nn.Conv2d(3, nb_channel, kernel_size=(3,3), stride=(1,1), padding = (3 -1)//2)
         self.conv5t = nn.ConvTranspose2d(nb_channel, 3, kernel_size=(3,3), stride=(1,1), padding = (3 -1)//2)
-        self.Relu =  nn.ReLU()
-        
+
+       
         
         self.NetBLock1 = NetBlock(nb_channel,nb_channel,5,2,transpose_flag=0) 
         self.TransNetBlock1 = NetBlock(nb_channel,nb_channel,5,2,transpose_flag=1)
-        self.NetBLock2 = NetBlock(32,32,3,1,transpose_flag=0) 
-        self.TransNetBLock2 = NetBlock(32,32,3,1,transpose_flag=1) 
+        
         self.Dropout = nn.Dropout(0.2)
 
-        self.Pool = nn.MaxPool2d(kernel_size = 2, return_indices = True)
-        self.unPool = nn.MaxUnpool2d(kernel_size = 2)
 
         self.bn1 = nn.BatchNorm2d(32)
         self.bn2 = nn.BatchNorm2d(32)
-        self.bn3 = nn.BatchNorm2d(32)
 
+        self.Relu =  nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
-        self.linear = nn.Linear(32*16*16,32*16*16)
 
 
-        # https://pytorch.org/vision/0.8/_modules/torchvision/models/resnet.html
-        #self.downsample = downsample
-    
         
     def forward(self,x):
         
-        verbose = False
-        
-        if verbose:
-            print("x_shape : ", x.shape)   
         y = self.conv1(x)
-        if verbose:
-            print("y_shape : ", y.shape)
+        
         y = self.bn1(y)
 
         y = self.Relu(y)
+        
         y = self.Dropout(y)
 
         y = self.NetBLock1(y)
-        if verbose:
-            print("y_shape : ", y.shape)
-        #y, indices = self.Pool(y)
-        if verbose:
-            print("y_shape : ", y.shape)
+        
         y = self.bn2(y)
 
-        #y = self.Relu(y)
         y = self.Dropout(y)
 
-        #y = self.NetBLock2(y)
-        if verbose:
-            print("y_shape : ", y.shape)
-        #y = self.Relu(y)
-        #y = self.Dropout(y)
-        #y = self.bn3(y)
-
-        #y = self.linear(y.view(self.batch_size,32*16*16))
-        #y = self.Relu(y).view(self.batch_size,32,16,16)
-
-        #y = self.TransNetBLock2(y)
-        if verbose:
-            print("y_shape : ", y.shape)
-        #y = self.unPool(y, indices)
-        if verbose:
-            print("y_shape : ", y.shape)
         y =  self.TransNetBlock1(y)
-        if verbose:
-            print("y_shape : ", y.shape)
+
         y = self.conv5t(y)
-        if verbose:
-            print("y_shape : ", y.shape)
 
         y = self.sigmoid(y)
+        
         return y
 
   
