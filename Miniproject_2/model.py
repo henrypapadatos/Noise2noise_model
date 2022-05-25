@@ -273,25 +273,41 @@ class UpsamplingNN(Module):
     def __init__(self,scale, input_size, output_size,kernel_size = 1):
         ##add inpput and output param + other to be able to do convolution
         self.scale = scale
-        self.conv2d = Conv2d(input_size, output_size, kernel_size, stride = self.scale)
+        self.conv2d = Conv2d(input_size, output_size, kernel_size, stride = 1)
 
     def forward (self , x) :
-        x_ = x.clone()
-        [b,c_i,h_i,w_i] = x_.shape
-        u1 = torch.zeros(w_i,w_i*self.scale)
+        
+        self.input = x.clone().float()
+        [b,c_i,h_i,w_i] = self.input.shape
+        u1 = torch.empty(w_i,w_i*self.scale).fill_(0).nan_to_num_()
         for i in range(w_i):
             u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
-        u2 = torch.zeros(h_i,h_i*self.scale)
+        self.u1 = u1
+        u2 = torch.empty(h_i,h_i*self.scale).fill_(0).nan_to_num_()
         for j in range(h_i):
             u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
-        '''
-        return torch.autograd.grad(outputs= self.output, inputs = self.input, grad_outputs=torch.ones_like(y))[0]
-        '''
-        
-        return self.conv2d(y)
+        self.u2 = u2
+        u1_i = torch.matmul(self.input,u1)
+        u1_i_t = torch.transpose(u1_i,2,3)
+        out = torch.matmul(u1_i_t,u2)
+        self.output = torch.transpose(out,2,3)
+        self.output = self.conv2d.forward(self.output)
+        return self.output 
+
+    
+    def backward (self , y) :
+        self.y = y.clone().float()
+        v1 = self.u1.t()
+        v2 = self.u2.t()
+        self.y = torch.transpose(self.y,2,3)
+        v2_y = torch.matmul(self.y,v2)
+        v2_y_t = torch.transpose(v2_y,2,3)
+        self.output2 = torch.matmul(v2_y_t,v1)
+        self.output2 = self.conv2d.backward(self.output)
+        return self.output2
 
     def param ( self ) :
-        return[]
+        return self.conv2d.params()
 
 
 def training_visualisation(imgs):
