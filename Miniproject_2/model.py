@@ -161,15 +161,16 @@ class Conv2d(Module):
     def backward (self,y):
         
         Y = y.clone()
-        # print(" MAX Y", Y.abs().max())
+        # print(" MAX Y", Y.abs().mean())
         #compute de derivative of the output wrt the bias
         self.gradbias=Y.sum((0,2,3))
-        # print(" MAX gradbias", self.gradbias.abs().max())
+        # print(" MAX gradbias", self.gradbias.abs().mean())
 
         lin_Y = Y.view(Y.shape[0],self.output_channel,Y.shape[2]*Y.shape[2])
         lin_weights_grad = lin_Y.matmul(self.unfolded_x.transpose(1,2)).sum(0)
         self.gradweight = lin_weights_grad.view(lin_weights_grad.size(0),self.input_channel, self.kernel_size[0],self.kernel_size[0])
-        # print(" MAX gradweight",self.gradweight.abs().max())
+
+        # print(" MAX gradweight",self.gradweight.abs().mean())
         # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
         lin_w = self.weight.view(self.weight.size(0), -1)
         lin_grad_wrt_input = lin_w.transpose(0,1).matmul(lin_Y)
@@ -178,64 +179,12 @@ class Conv2d(Module):
 
         return grad_wrt_input
     
-    
-        '''
-        #compute de derivative of the output wrt the weigths
-        unfolded = torch.nn.functional.unfold(self.input.clone(), kernel_size = output.shape[-2:], dilation = self.dilation, padding = self.padding, stride = self.stride)      
-        #out = unfolded.transpose(1, 2).matmul(part_output.view(part_output.size(0), -1).t()).transpose(1, 2)  
-        out = output.reshape(self.output_channel, -1).matmul(unfolded.view(1,-1, self.input_channel*unfolded.shape[-1]))
-        dydkernel = out.view(self.weight.size())
-        self.gradweight+=dydkernel
-        
-        # comput the derivative of the output wrt the input
-        output = y.clone()
-        padding = (output.size(2)-1+self.padding,output.size(3)-1+self.padding)
-        kernel = self.weight.clone().flip((2,3)).transpose(0,1)
-        unfolded = torch.nn.functional.unfold(kernel, kernel_size = output.shape[-2:], dilation = self.dilation, padding = padding, stride = self.stride)      
-        #out = unfolded.transpose(1, 2).matmul(part_output.view(part_output.size(0), -1).t()).transpose(1, 2)  
-        out = output.reshape(output.size(0), -1).matmul(unfolded)
-        dydinput = out.view(self.input.size())
-
-        return dydinput
-        '''
-        # #compute de derivative of the output wrt the weights
-        # output = output.permute(1, 2, 3, 0).reshape(self.output_channel, -1)
-        # modified_input= torch.nn.functional.unfold(self.input.clone(), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
-        # modified_input = modified_input.permute(1,2,0)
-        # modified_input = modified_input.reshape(modified_input.size(0), -1)
-        # #dy/dkernel = conv(self.input, y)
-        # dydkernel = torch.matmul(output, modified_input.t())
-        
-        #dydkernel has the wrond dimension :(
-        #self.gradweight += dydkernel
-        
-        # modified_weights = self.weight.clone().permute(1,2,3,0).reshape(self.output_channel, -1)
-        # dydinput = torch.matmul(modified_weights.t(), output)
-        #dy/input 
-        
-       # y_var = self.output.clone()
-
-
-        #var_y_ = Variable(y.data, requires_grad=True)
-        #torch.autograd.backward(self.output, torch.ones_like(self.output))
-        #self.gradweight = self.weight.grad
-        #self.gradbias = self.bias.grad
-        '''
-        (gradwrtinput,self.gradweight,self.gradbias)=torch.autograd.grad(outputs= self.output, inputs = (self.input,self.weight,self.bias), grad_outputs=torch.ones_like(self.output))
-        
-        return gradwrtinput
-        '''
-    
     def param( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
 
 
 class Optimizer(Module):
     def __init__(self, lr, momentum=0, dampening=0, weight_decay=0, nesterov=False, maximize=False):
-        #self.momentum = momentum
-        #self.dampening = dampening
-        #self.weight_decay = weight_decay
-        #self.nesterov = nesterov
         self.maximize = maximize
         self.lr = lr
         self.params = None
@@ -245,20 +194,6 @@ class Optimizer(Module):
         for param_layer in params:
             for param in param_layer:
                 g_t = param[1]
-                #if self.weight_decay:
-                    #g_t = g_t + self.weight_decay*param[0]
-                #if self.momentum:
-                    #if not self.prev_b: #if self.prev_b = 0
-                        #b_t = g_t
-                    #else:
-                        #b_t = self.momentum*self.prev_b + (1-self.dampening)*g_t  #eta is learning rate
-                        #self.prev_b = b_t
-                    #if self.nesterov:
-                        #g_t = g_t+self.momentum*b_t #help its g_t-1
-                    #else:
-                        #g_t = b_t
-
-                 
                 if self.maximize:
                     param[0].add_(self.lr * g_t)
                 else:
@@ -306,7 +241,7 @@ class Upsampling(Module):
         v2_y = torch.matmul(y_,v2)
         v2_y_t = torch.transpose(v2_y,2,3)
         output2 = torch.matmul(v2_y_t,v1)
-        return output2
+        return output2.div_(self.scale)
 
     def param ( self ) :
         return self.conv2d.param()
@@ -331,27 +266,26 @@ def training_visualisation(imgs):
     
 class Model():
     def __init__(self):
-        self.lr = 2.0 #0.001 best  0.00001
+        self.lr = 4.0 #0.001 best  0.00001
         self.nb_epoch = 100
         self.batch_size = 500
         #self.batch_size = 50
         self.optimizer = Optimizer(lr= self.lr)
         self.criterion = MSE()
+        self.channel = 32
         ### LINEAR ##
         #self.model = Sequential(Linear(20,25), Relu(), Linear(25,25),Relu(),Linear(25,20),Sigmoid())
         #self.model = Sequential(Linear(2,25),Relu(),Linear(25,25),Relu(),Linear(25,25),Relu(),Linear(25,2),Sigmoid())
 
         ### CONV2D ##
-        #self.model = Sequential(Conv2d(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1), Sigmoid())
-        #self.model = Sequential(Conv2d(input_channel = 3,output_channel = 4,kernel_size = 5, padding = 2, stride = 1))
-        #self.model = Sequential(Conv2d(input_channel = 3,output_channel = 32,kernel_size = 3, padding = 1, stride = 2),Relu(), Conv2d(32,3,kernel_size = 3, padding = 1, stride = 2), UpsamplingNN(scale = 2, input_size = 3, output_size = 3, kernel_size = 1), Relu(), UpsamplingNN(scale = 2, input_size = 3, output_size = 3, kernel_size = 1), Sigmoid())
-        self.model = Sequential(Conv2d(input_channel = 3,output_channel = 16,kernel_size = 3, padding = 1, stride = 2)
+        # self.model = Sequential(Conv2d(input_channel = 3,output_channel = 16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,3,kernel_size = 3, padding = 1, stride = 1),Sigmoid())
+        self.model = Sequential(Conv2d(input_channel = 3,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
                                 ,Relu()
-                                ,Conv2d(input_channel = 16,output_channel = 16,kernel_size = 3, padding = 1, stride = 2)
-                                ,Relu()
-                                ,Upsampling(16,16,kernel_size = 3, scale= 2, padding = 1)
-                                ,Relu()
-                                ,Upsampling(16,3,kernel_size = 3, scale= 2, padding = 1)
+                                # ,Conv2d(input_channel = self.channel,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
+                                # ,Relu()
+                                # ,Upsampling(self.channel,self.channel,kernel_size = 3, scale= 2, padding = 1)
+                                # ,Relu()
+                                ,Upsampling(self.channel,3,kernel_size = 3, scale= 2, padding = 1)
                                 ,Sigmoid())
 
     def load_pretrained_model(self):
