@@ -226,7 +226,7 @@ class Conv2d(Module):
         return gradwrtinput
         '''
     
-    def param ( self ) :
+    def param( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
 
 
@@ -271,16 +271,16 @@ class Optimizer(Module):
     def param ( self ) :
         return self.params
 
-class UpsamplingNN(Module):
-    def __init__(self,scale, input_size, output_size,kernel_size = 1):
+class Upsampling(Module):
+    def __init__(self, input_channel, output_channel, kernel_size, scale = 1, stride = 1, padding = 0, dilation= 1):
         ##add inpput and output param + other to be able to do convolution
         self.scale = scale
-        self.conv2d = Conv2d(input_size, output_size, kernel_size, stride = 1)
+        self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
 
     def forward (self , x) :
         
-        self.input = x.clone().float()
-        [b,c_i,h_i,w_i] = self.input.shape
+        input_ = x.clone().float()
+        [b,c_i,h_i,w_i] = input_.shape
         u1 = torch.empty(w_i,w_i*self.scale).fill_(0).nan_to_num_()
         for i in range(w_i):
             u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
@@ -289,27 +289,27 @@ class UpsamplingNN(Module):
         for j in range(h_i):
             u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
         self.u2 = u2
-        u1_i = torch.matmul(self.input,u1)
+        u1_i = torch.matmul(input_,u1)
         u1_i_t = torch.transpose(u1_i,2,3)
         out = torch.matmul(u1_i_t,u2)
-        self.output = torch.transpose(out,2,3)
-        self.output = self.conv2d.forward(self.output)
-        return self.output 
+        output = torch.transpose(out,2,3)
+        output = self.conv2d.forward(output)
+        return output 
 
     
     def backward (self , y) :
-        self.y = y.clone().float()
+        y_ = y.clone().float()
+        y_ = self.conv2d.backward(y_)
         v1 = self.u1.t()
         v2 = self.u2.t()
-        self.y = torch.transpose(self.y,2,3)
-        v2_y = torch.matmul(self.y,v2)
+        y_ = torch.transpose(y_,2,3)
+        v2_y = torch.matmul(y_,v2)
         v2_y_t = torch.transpose(v2_y,2,3)
-        self.output2 = torch.matmul(v2_y_t,v1)
-        self.output2 = self.conv2d.backward(self.output)
-        return self.output2
+        output2 = torch.matmul(v2_y_t,v1)
+        return output2
 
     def param ( self ) :
-        return self.conv2d.params()
+        return self.conv2d.param()
 
 
 def training_visualisation(imgs):
@@ -345,7 +345,14 @@ class Model():
         #self.model = Sequential(Conv2d(3,3,kernel_size = 2, padding = 1, dilation = 2, stride = 1), Sigmoid())
         #self.model = Sequential(Conv2d(input_channel = 3,output_channel = 4,kernel_size = 5, padding = 2, stride = 1))
         #self.model = Sequential(Conv2d(input_channel = 3,output_channel = 32,kernel_size = 3, padding = 1, stride = 2),Relu(), Conv2d(32,3,kernel_size = 3, padding = 1, stride = 2), UpsamplingNN(scale = 2, input_size = 3, output_size = 3, kernel_size = 1), Relu(), UpsamplingNN(scale = 2, input_size = 3, output_size = 3, kernel_size = 1), Sigmoid())
-        self.model = Sequential(Conv2d(input_channel = 3,output_channel = 16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,3,kernel_size = 3, padding = 1, stride = 1),Sigmoid())
+        self.model = Sequential(Conv2d(input_channel = 3,output_channel = 16,kernel_size = 3, padding = 1, stride = 2)
+                                ,Relu()
+                                ,Conv2d(input_channel = 16,output_channel = 16,kernel_size = 3, padding = 1, stride = 2)
+                                ,Relu()
+                                ,Upsampling(16,16,kernel_size = 3, scale= 2, padding = 1)
+                                ,Relu()
+                                ,Upsampling(16,3,kernel_size = 3, scale= 2, padding = 1)
+                                ,Sigmoid())
 
     def load_pretrained_model(self):
         ## This loads the parameters saved in bestmodel .pth into the model$
