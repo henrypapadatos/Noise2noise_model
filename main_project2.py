@@ -101,38 +101,38 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
 # input_rand, target_rand = generate_disk_dataset(nb_points)
 # test_input_rand ,test_target_rand = generate_disk_dataset(nb_points)
 ##############################################################################################################"""
-def psnr(denoised, ground_truth):
-    #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
-    mse = torch.mean((denoised - ground_truth )** 2)
-    psnr = -10 * torch . log10 ( mse + 10** -8)
-    return psnr.item()
+# def psnr(denoised, ground_truth):
+#     #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
+#     mse = torch.mean((denoised - ground_truth )** 2)
+#     psnr = -10 * torch . log10 ( mse + 10** -8)
+#     return psnr.item()
 
-model = nn.Sequential(nn.Conv2d(3, 16, kernel_size=(3,3), stride=(1,1), padding=1),
-                      nn.ReLU(),
-                      nn.Conv2d(16, 16, kernel_size=(3,3), stride=(1,1), padding=1),
-                      nn.ReLU(),
-                      nn.Conv2d(16, 3, kernel_size=(3,3), stride=(1,1), padding=1),
-                      nn.Sigmoid()
-                      )
+# model = nn.Sequential(nn.Conv2d(3, 16, kernel_size=(3,3), stride=(1,1), padding=1),
+#                       nn.ReLU(),
+#                       nn.Conv2d(16, 16, kernel_size=(3,3), stride=(1,1), padding=1),
+#                       nn.ReLU(),
+#                       nn.Conv2d(16, 3, kernel_size=(3,3), stride=(1,1), padding=1),
+#                       nn.Sigmoid()
+#                       )
 
-lr = 0.001
-batch_size=500
-nb_epoch=100
+# lr = 0.001
+# batch_size=500
+# nb_epoch=100
 
-optimizer = torch.optim.SGD(model.parameters(), lr)
-criterion = nn.MSELoss()
+# optimizer = torch.optim.SGD(model.parameters(), lr)
+# criterion = nn.MSELoss()
   
-for e in range(nb_epoch):
-    for input, targets in zip(noisy_imgs_1.split(batch_size),  
-                              noisy_imgs_2.split(batch_size)):
-        output = model((input/255).float())
-        loss = criterion(output/255, targets/255)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+# for e in range(nb_epoch):
+#     for input, targets in zip(noisy_imgs_1.split(batch_size),  
+#                               noisy_imgs_2.split(batch_size)):
+#         output = model((input/255).float())
+#         loss = criterion(output/255, targets/255)
+#         optimizer.zero_grad()
+#         loss.backward()
+#         optimizer.step()
         
-    psnr=psnr(model(test_imgs), clean_imgs)
-    print('Nb of epoch: {:d}    psnr: {:.02f}    loss: {:.08f}'.format(e, psnr, loss))
+#     psnr=psnr(model(test_imgs), clean_imgs)
+#     print('Nb of epoch: {:d}    psnr: {:.02f}    loss: {:.08f}'.format(e, psnr, loss))
 
         
 
@@ -142,7 +142,7 @@ for e in range(nb_epoch):
             
 ############################################################################################################################################
 
-# model = model.Model()
+model = model.Model()
 
-# # model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
-# model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs)
+# model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
+model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs)

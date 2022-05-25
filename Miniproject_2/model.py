@@ -52,7 +52,7 @@ class MSE(Module):
         return (self.prediction - self.target).pow(2).mean()
         #return torch.rand(100,4,32,32)
     def backward (self) :
-        return 2* (self.prediction-self.target).mean()#/torch.prod(torch.tensor(self.prediction.size()))       
+        return 2* (self.prediction-self.target)/self.prediction.numel()     
     def param ( self ) :
         return []
 
@@ -157,19 +157,19 @@ class Conv2d(Module):
         self.output = self.conv(self.input)
         return self.output
 
+
     def backward (self,y):
         
         Y = y.clone()
-        #print(" MAX Y", Y.abs().max())
+        # print(" MAX Y", Y.abs().max())
         #compute de derivative of the output wrt the bias
-        dydbias = Y.sum((2,3))
-        self.gradbias+=dydbias.mean(0)
-        #print(" MAX gradbias", self.gradbias.abs().max())
+        self.gradbias=Y.sum((0,2,3))
+        # print(" MAX gradbias", self.gradbias.abs().max())
 
         lin_Y = Y.view(Y.shape[0],self.output_channel,Y.shape[2]*Y.shape[2])
-        lin_weights_grad = lin_Y.matmul(self.unfolded_x.transpose(1,2)).mean(0)
-        self.gradweight += lin_weights_grad.view(lin_weights_grad.size(0),self.input_channel, self.kernel_size[0],self.kernel_size[0])
-        #print(" MAX gradweight",self.gradweight.abs().max())
+        lin_weights_grad = lin_Y.matmul(self.unfolded_x.transpose(1,2)).sum(0)
+        self.gradweight = lin_weights_grad.view(lin_weights_grad.size(0),self.input_channel, self.kernel_size[0],self.kernel_size[0])
+        # print(" MAX gradweight",self.gradweight.abs().max())
         # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
         lin_w = self.weight.view(self.weight.size(0), -1)
         lin_grad_wrt_input = lin_w.transpose(0,1).matmul(lin_Y)
@@ -177,6 +177,8 @@ class Conv2d(Module):
         #print(" MAX grad_wrt_input", grad_wrt_input.abs().max())
 
         return grad_wrt_input
+    
+    
         '''
         #compute de derivative of the output wrt the weigths
         unfolded = torch.nn.functional.unfold(self.input.clone(), kernel_size = output.shape[-2:], dilation = self.dilation, padding = self.padding, stride = self.stride)      
@@ -263,7 +265,7 @@ class Optimizer(Module):
                     param[0].sub_(self.lr * g_t)
                 
                 #After gradient step reanitialise that gradients of the wieghts.
-                param[1].mul_(0)
+                param[1].fill_(0)
         return params
 
     def param ( self ) :
@@ -313,7 +315,7 @@ def training_visualisation(imgs):
     
 class Model():
     def __init__(self):
-        self.lr = 0.003 #0.001 best
+        self.lr = 2.0 #0.001 best  0.00001
         self.nb_epoch = 100
         self.batch_size = 500
         #self.batch_size = 50
