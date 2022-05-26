@@ -50,12 +50,12 @@ with torch.no_grad():
 
 # print(y-y_torch)
 
-# y = sequential.backward(y)
+# y = sequental.backward(y)
 
 # # y_torch.backward(gradient)
 # print(y-torch.gradient(y_torch))
 ################################################################ OUR DATASET ##########################################################
-subset_train = 1000
+subset_train = 10000
 subset_test = 100
 
 noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
@@ -145,4 +145,4 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
 model = model.Model()
 
 # model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
-model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs)
+model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs, vizualisation_flag = True)

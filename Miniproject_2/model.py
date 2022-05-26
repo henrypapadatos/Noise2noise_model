@@ -1,7 +1,6 @@
 
+import os
 import torch
-from torch import nn
-from torch import empty
 import matplotlib.pyplot as plt
 import math
 from torch.nn.functional import fold
@@ -139,7 +138,7 @@ class Conv2d(Module):
         h_in, w_in = x_.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
-        unfolded = torch.nn.functional.unfold(x_, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        unfolded = unfold(x_, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
         self.unfolded_x = unfolded.clone()
         out = unfolded.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2) + bias.view(1,-1,1)
         output = out.view(x_.shape[0], self.output_channel, int(h_out), int(w_out))
@@ -174,7 +173,7 @@ class Conv2d(Module):
         # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
         lin_w = self.weight.view(self.weight.size(0), -1)
         lin_grad_wrt_input = lin_w.transpose(0,1).matmul(lin_Y)
-        grad_wrt_input = torch.nn.functional.fold(lin_grad_wrt_input,output_size=(self.input.shape[-1],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        grad_wrt_input = fold(lin_grad_wrt_input,output_size=(self.input.shape[-1],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
         #print(" MAX grad_wrt_input", grad_wrt_input.abs().max())
 
         return grad_wrt_input
@@ -241,7 +240,7 @@ class Upsampling(Module):
         v2_y = torch.matmul(y_,v2)
         v2_y_t = torch.transpose(v2_y,2,3)
         output2 = torch.matmul(v2_y_t,v1)
-        return output2.div_(self.scale)
+        return output2
 
     def param ( self ) :
         return self.conv2d.param()
@@ -266,9 +265,9 @@ def training_visualisation(imgs):
     
 class Model():
     def __init__(self):
-        self.lr = 4.0 #0.001 best  0.00001
+        self.lr = 2.5 #0.001 best  0.00001
         self.nb_epoch = 100
-        self.batch_size = 500
+        self.batch_size = 40 #20
         #self.batch_size = 50
         self.optimizer = Optimizer(lr= self.lr)
         self.criterion = MSE()
@@ -281,17 +280,17 @@ class Model():
         # self.model = Sequential(Conv2d(input_channel = 3,output_channel = 16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,3,kernel_size = 3, padding = 1, stride = 1),Sigmoid())
         self.model = Sequential(Conv2d(input_channel = 3,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
                                 ,Relu()
-                                # ,Conv2d(input_channel = self.channel,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
-                                # ,Relu()
-                                # ,Upsampling(self.channel,self.channel,kernel_size = 3, scale= 2, padding = 1)
-                                # ,Relu()
+                                ,Conv2d(input_channel = self.channel,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
+                                ,Relu()
+                                ,Upsampling(self.channel,self.channel,kernel_size = 3, scale= 2, padding = 1)
+                                ,Relu()
                                 ,Upsampling(self.channel,3,kernel_size = 3, scale= 2, padding = 1)
                                 ,Sigmoid())
 
     def load_pretrained_model(self):
-        ## This loads the parameters saved in bestmodel .pth into the model$
-        #full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
-        #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
+        # This loads the parameters saved in bestmodel .pth into the model$
+        full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
+        self.model = torch.load(full_path,map_location=torch.device('cpu'))
         pass 
     def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
         #num_epochs = 10
@@ -347,80 +346,3 @@ class Model():
         mse = torch.mean((denoised - ground_truth )** 2)
         psnr = -10 * torch . log10 ( mse + 10** -8)
         return psnr.item()
-
-class Linear(Module):
-    """ A Module implementing the sequential combination of several modules. It stores the individual modules in a list modules.
-    """
-    
-    def __init__(self,input_features,output_features,bias=True):
-        super(Linear).__init__()
-        
-        self.input_features = input_features
-        self.output_features = output_features
-        
-        self.weights = empty(input_features,output_features).nan_to_num()
-        self.weights_grad = empty(input_features,output_features).nan_to_num()
-        
-        if bias :
-            self.bias = empty(output_features).nan_to_num()
-            self.bias_grad = empty(output_features).nan_to_num()
-        else : 
-            self.bias = None
-            self.bias_grad = None
-        
-        self.reset()
-    
-    def reset(self):
-        """ Initializes the weights at random and the biases at 0 if they are defined
-        """
-        
-        std = 1. / math.sqrt(self.weights.size(0))
-        self.weights.normal_(-std,std)
-        self.weights_grad.fill_(0)
-        if self.bias is not None : 
-            self.bias.fill_(0)
-            self.bias_grad.fill_(0)
-    def forward(self,input):
-        """ Implements the forward pass for the Linear Module
-        Saves the input for the backward pass when we will need to compute gradients, under self.input  
-        Computes Y = X*w + b
-        """
-        self.input = input.clone()
-        if self.bias is not None:
-            return self.input.matmul(self.weights).add(self.bias)
-        else :
-            return self.input.matmul(self.weights)
-        
-    def backward(self,gradwrtoutput):
-        """ Implements the backward pass for the Linear Module
-        Uses the chain rule to compute the gradients wrt the weights, bias, and input and stores them in the instance parameters
-        Arguments:
-             #gradwrtoutput : dL/dy in the backprogation formulas 
-        """
-        
-        # Computes gradient wrt weights dw = X^(T) * dy using the backpropagation formulas
-        self.weights_grad = self.input.t().matmul(gradwrtoutput)
-        
-        # Computes gradient wrt bias iff bias is not none
-        # db = dy ^ (T) * 1  using the backpropagation formulas, 
-        # The sum is to take for account the possibility that we process our inputs by batches of size greater than 1, we sum the gradient contributions of independent points
-        if self.bias is not None : 
-                self.bias_grad = gradwrtoutput.t().sum(1)
-        
-
-        # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
-        return gradwrtoutput.matmul(self.weights.t())
-    
-    
-    def param(self):
-        """ Returns a list of pairs, each composed of a parameter tensor and its corresponding gradient tensor of same size
-        """
-        if self.bias is not None : 
-            return [(self.weights,self.weights_grad),(self.bias,self.bias_grad)]
-        else : 
-            return [(self.weights,self.weights_grad)]
-        
-        
-        
-    
-    
