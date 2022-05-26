@@ -3,9 +3,9 @@ import os
 import torch
 from torch import empty
 import matplotlib.pyplot as plt
-from torch.nn.functional import fold
-from torch.nn.functional import unfold
+from torch.nn.functional import fold, unfold
 import math
+torch.set_default_dtype(torch.float64)
 
 class Module ( object ) :
     def forward ( self , x ) :
@@ -115,13 +115,13 @@ class Conv2d(Module):
         '''
         self.weight = empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0)
         k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
-        self.weight.uniform_(-k,k).nan_to_num_()
+        self.weight.double().uniform_(-k,k).nan_to_num_()
         #self.weight = self.weight.fill_(0).uniform_(-k,k)
-        self.bias = empty(output_channel).fill_(0)
+        self.bias = empty(output_channel).fill_(0).double()
         self.bias.uniform_(-k,k).nan_to_num_()
         #self.bias = self.bias.fill_(0).uniform_(-k,k)
-        self.gradweight = empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0).nan_to_num_()
-        self.gradbias = empty(output_channel).fill_(0).nan_to_num_()
+        self.gradweight = empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0).double().nan_to_num_()
+        self.gradbias = empty(output_channel).fill_(0).double().nan_to_num_()
         
     def __call__(self, input):
         return self.forward(input)
@@ -133,7 +133,7 @@ class Conv2d(Module):
             weights = self.weight.clone()
             bias = self.bias.clone()
         elif bias==None:
-            bias= empty(weights.size()[0]).fill_(0).nan_to_num()
+            bias= empty(weights.size()[0]).double().fill_(0).nan_to_num()
 
         h_in, w_in = x_.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
@@ -213,7 +213,7 @@ class Upsampling(Module):
 
     def forward (self , x) :
         
-        input_ = x.clone().float()
+        input_ = x.clone()
         [b,c_i,h_i,w_i] = input_.shape
         u1 = empty(w_i,w_i*self.scale).fill_(0).nan_to_num_()
         for i in range(w_i):
@@ -232,7 +232,7 @@ class Upsampling(Module):
 
     
     def backward (self , y) :
-        y_ = y.clone().float()
+        y_ = y.clone()
         #y_ = self.conv2d.backward(y_)
         v1 = self.u1.t()
         v2 = self.u2.t()
@@ -292,8 +292,17 @@ class Model():
         full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
         self.model = torch.load(full_path,map_location=torch.device('cpu'))
         pass 
-    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
-        #num_epochs = 10
+    def train(self, train_input, train_target, num_epochs = 100,test_input=None, test_target=None, vizualisation_flag = False):
+
+        train_input = train_input.double()
+        train_target = train_target.double()
+        
+        if test_input != None:
+            test_input = test_input.double()
+        if test_target != None:
+            test_target = test_target.double()
+
+
 
         if vizualisation_flag and test_input!=None:
             plt.ion()
@@ -334,15 +343,16 @@ class Model():
         #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network .
         #normalize image between 0 and 1
-        input_imgs_ = (input_imgs/255).float()
+        input_imgs_ = input_imgs/255
         output = self.model.forward(input_imgs_)
 
         # output should be an int between [0,255]
-        output = output.mul(255).clip(0, 255)
+        #output.mul_(255).clip_(0, 255)
+        output = torch.clip(output*255,0,255)
         return output
     
     def psnr(self, denoised, ground_truth):
         #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
         mse = torch.mean((denoised - ground_truth )** 2)
-        psnr = -10 * torch . log10 ( mse + 10** -8)
+        psnr = -10 * torch.log10 ( mse + 10** -8)
         return psnr.item()
