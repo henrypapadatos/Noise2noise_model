@@ -21,6 +21,8 @@ class Module ( object ) :
 class Relu(Module):
     def __init___(self):
         self.input = None
+    def __call__(self, x):
+        return self.forward(x)
     def forward ( self , x) :
         self.input = x.clone()
         return self.input.mul((self.input>0))
@@ -32,6 +34,9 @@ class Relu(Module):
 class Sigmoid(Module):
     def __init__(self):
         self.input = None
+        
+    def __call__(self, x):
+        return self.forward(x)
 
     def forward (self, x) :
         self.input = x.clone()
@@ -45,6 +50,8 @@ class Sigmoid(Module):
         return []
     
 class MSE(Module):
+    def __call__(self, x, x_target):
+        return self.forward(x, x_target)
     def forward (self, x, x_target) :
         
         self.prediction = x.clone()
@@ -55,41 +62,6 @@ class MSE(Module):
         return 2* (self.prediction-self.target)/self.prediction.numel()     
     def param ( self ) :
         return []
-
-class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you are asking it to 
-    def __init__(self, *type_layer):
-        #super().__init__()
-        self.type_layer = type_layer
-    # ex: 1 Sequential ( Conv( stride 2) , ReLU , Conv ( stride 2) , ReLU , Upsampling , ReLU , Upsampling , Sigmoid )
-
-    def forward (self,x):
-        # for looop from start to begning
-        #print("y",x)
-        x_ = x.clone()
-        for layer in self.type_layer:
-            #later we will have to call layer.param
-            x_ = layer.forward(x_)
-            #layer.forward(layer.param())
-            #print("forward_layer",x_)
-        return x_
-    
-    def backward (self,y):
-        #print("y",y)
-        y_ = y.clone()
-        for layer in reversed(self.type_layer):
-            y_ = layer.backward(y_)
-            #print("backward_layer",y_)
-            #print("backward_layer",y_)
-
-        return y_
-
-    def param(self):
-
-        parameters = []
-        for layer in self.type_layer:
-            parameters.append(layer.param())
-
-        return parameters
 
 
 class Conv2d(Module):
@@ -106,81 +78,107 @@ class Conv2d(Module):
         self.output_channel = output_channel
         self.input_channel = input_channel
         self.input = None
-        
-       
-        #initializing them
-        '''
-        std = 1. / math.sqrt(self.weights.size(0))
-        self.weights.normal_(-std,std)
-        
-        '''
         self.weight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0)
         k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         self.weight.uniform_(-k,k).nan_to_num_()
-        #self.weight = self.weight.fill_(0).uniform_(-k,k)
         self.bias = torch.empty(output_channel).fill_(0)
         self.bias.uniform_(-k,k).nan_to_num_()
-        #self.bias = self.bias.fill_(0).uniform_(-k,k)
         self.gradweight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0).nan_to_num_()
         self.gradbias = torch.empty(output_channel).fill_(0).nan_to_num_()
         
-    def __call__(self, input):
-        return self.forward(input)
-
-    def conv (self,x, weights=None, bias=None):
-        x_ = x.clone()
-
-        if weights==None:
-            weights = self.weight.clone()
-            bias = self.bias.clone()
-        elif bias==None:
-            bias= torch.empty(weights.size()[0]).fill_(0).nan_to_num()
-
-        h_in, w_in = x_.shape[2:]
-        h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
-        w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
-        unfolded = unfold(x_, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
-        self.unfolded_x = unfolded.clone()
-        out = unfolded.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2) + bias.view(1,-1,1)
-        output = out.view(x_.shape[0], self.output_channel, int(h_out), int(w_out))
+        if torch.cuda.is_available():
+            self.weight = self.weight.cuda()
+            self.bias = self.bias.cuda()
+            self.gradweight = self.weight.cuda()
+            self.gradbias = self.bias.cuda()
         
-        return output
+    def __call__(self, x):
+        return self.forward(x)
         
     def forward (self,x):
         self.input = x.clone()
-    
-        '''
-        self.weight.requires_grad_(requires_grad = True)
-        self.input.requires_grad_(requires_grad = True)
-        self.bias.requires_grad_(requires_grad = True)
-        '''
-        self.output = self.conv(self.input)
-        return self.output
-
+        
+        weights = self.weight.clone()
+        bias = self.bias.clone()
+        
+        h_in, w_in = self.input.shape[2:]
+        h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
+        w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
+        unfolded = unfold(self.input, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        self.unfolded_x = unfolded.clone()
+        out = unfolded.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2) + bias.view(1,-1,1)
+        output = out.view(self.input.shape[0], self.output_channel, int(h_out), int(w_out))
+        
+        return output
 
     def backward (self,y):
         
         Y = y.clone()
-        # print(" MAX Y", Y.abs().mean())
+        
         #compute de derivative of the output wrt the bias
         self.gradbias=Y.sum((0,2,3))
-        # print(" MAX gradbias", self.gradbias.abs().mean())
 
-        lin_Y = Y.view(Y.shape[0],self.output_channel,Y.shape[2]*Y.shape[2])
+        lin_Y = Y.view(Y.shape[0],self.output_channel,Y.shape[2]*Y.shape[3])
         lin_weights_grad = lin_Y.matmul(self.unfolded_x.transpose(1,2)).sum(0)
-        self.gradweight = lin_weights_grad.view(lin_weights_grad.size(0),self.input_channel, self.kernel_size[0],self.kernel_size[0])
+        self.gradweight = lin_weights_grad.view(lin_weights_grad.size(0),self.input_channel, self.kernel_size[0],self.kernel_size[1])
 
-        # print(" MAX gradweight",self.gradweight.abs().mean())
         # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
         lin_w = self.weight.view(self.weight.size(0), -1)
         lin_grad_wrt_input = lin_w.transpose(0,1).matmul(lin_Y)
-        grad_wrt_input = fold(lin_grad_wrt_input,output_size=(self.input.shape[-1],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
-        #print(" MAX grad_wrt_input", grad_wrt_input.abs().max())
+        grad_wrt_input = fold(lin_grad_wrt_input,output_size=(self.input.shape[-2],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
 
         return grad_wrt_input
     
     def param( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
+    
+class Upsampling(Module):
+    def __init__(self, input_channel, output_channel, kernel_size, scale = 1, stride = 1, padding = 0, dilation= 1):
+        ##add inpput and output param + other to be able to do convolution
+        self.scale = scale
+        self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
+    
+    def __call__(self, x):
+        return self.forward(x)
+    
+    def forward (self , x) :
+        
+        input_ = x.clone().float()
+        [b,c_i,h_i,w_i] = input_.shape
+        u1 = torch.empty(w_i,w_i*self.scale).fill_(0).nan_to_num_()
+        u2 = torch.empty(h_i,h_i*self.scale).fill_(0).nan_to_num_()
+
+        if torch.cuda.is_available():
+                    u1 = u1.cuda()
+                    u2 = u2.cuda()
+                    
+        for i in range(w_i):
+            u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
+        self.u1 = u1
+        for j in range(h_i):
+            u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
+        self.u2 = u2
+        u1_i = torch.matmul(input_,u1)
+        u1_i_t = torch.transpose(u1_i,2,3)
+        out = torch.matmul(u1_i_t,u2)
+        output = torch.transpose(out,2,3)
+        output = self.conv2d.forward(output)
+        return output 
+    
+    def backward (self , y) :
+        y_ = y.clone().float()
+        y_ = self.conv2d.backward(y_)
+        v1 = self.u1.t()
+        v2 = self.u2.t()
+        y_ = torch.transpose(y_,2,3)
+        v2_y = torch.matmul(y_,v2)
+        v2_y_t = torch.transpose(v2_y,2,3)
+        output2 = torch.matmul(v2_y_t,v1)
+        return output2
+
+    def param ( self ) :
+        return self.conv2d.param()
+
 
 
 class Optimizer(Module):
@@ -188,7 +186,7 @@ class Optimizer(Module):
         self.maximize = maximize
         self.lr = lr
         self.params = None
-        #self.prev_b = 0
+        
     def step(self, params):
 
         for param_layer in params:
@@ -205,47 +203,33 @@ class Optimizer(Module):
 
     def param ( self ) :
         return self.params
-
-class Upsampling(Module):
-    def __init__(self, input_channel, output_channel, kernel_size, scale = 1, stride = 1, padding = 0, dilation= 1):
-        ##add inpput and output param + other to be able to do convolution
-        self.scale = scale
-        self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
-
-    def forward (self , x) :
-        
-        input_ = x.clone().float()
-        [b,c_i,h_i,w_i] = input_.shape
-        u1 = torch.empty(w_i,w_i*self.scale).fill_(0).nan_to_num_()
-        for i in range(w_i):
-            u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
-        self.u1 = u1
-        u2 = torch.empty(h_i,h_i*self.scale).fill_(0).nan_to_num_()
-        for j in range(h_i):
-            u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
-        self.u2 = u2
-        u1_i = torch.matmul(input_,u1)
-        u1_i_t = torch.transpose(u1_i,2,3)
-        out = torch.matmul(u1_i_t,u2)
-        output = torch.transpose(out,2,3)
-        output = self.conv2d.forward(output)
-        return output 
-
     
-    def backward (self , y) :
-        y_ = y.clone().float()
-        y_ = self.conv2d.backward(y_)
-        v1 = self.u1.t()
-        v2 = self.u2.t()
-        y_ = torch.transpose(y_,2,3)
-        v2_y = torch.matmul(y_,v2)
-        v2_y_t = torch.transpose(v2_y,2,3)
-        output2 = torch.matmul(v2_y_t,v1)
-        return output2
+class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you are asking it to 
+    def __init__(self, *type_layer):
+        self.type_layer = type_layer
+        
+    def __call__(self, x):
+       return self.forward(x)
+   
+    def forward (self,x):
+        x_ = x.clone()
+        for layer in self.type_layer:
+            x_ = layer(x_)
+        return x_
+    
+    def backward (self,y):
+        y_ = y.clone()
+        for layer in reversed(self.type_layer):
+            y_ = layer.backward(y_)
+        return y_
 
-    def param ( self ) :
-        return self.conv2d.param()
+    def param(self):
 
+        parameters = []
+        for layer in self.type_layer:
+            parameters.append(layer.param())
+
+        return parameters
 
 def training_visualisation(imgs):
     #Plot the 4 first images of imgs in a subplot way
@@ -306,12 +290,20 @@ class Model():
     
     def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
         #num_epochs = 10
+        
+        if torch.cuda.is_available():
+            train_input = train_input.cuda()
+            train_target = train_target.cuda()
+            if test_input is not None: 
+                test_input = test_input.cuda()
+                test_target = test_target.cuda()
 
         if vizualisation_flag and test_input!=None:
             plt.ion()
             plt.show()
             training_visualisation(test_target)
             training_visualisation(test_input)
+            
         
         if test_input!=None:
             initial_psnr = self.psnr(test_input/255, test_target/255)
@@ -324,12 +316,10 @@ class Model():
 
                 
                 output = self.predict(input)
-                loss = self.criterion.forward(output/255, targets/255)
+                loss = self.criterion(output/255, targets/255)
                 grad_loss = self.criterion.backward()
                 self.model.backward(grad_loss)
-                # add SGD here
-                #with torch.no_grad():  
-                params =  self.optimizer.step(self.model.param())
+                self.optimizer.step(self.model.param())
 
 
             if test_input!=None:
@@ -346,11 +336,25 @@ class Model():
         #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network .
         #normalize image between 0 and 1
+        
+        moved_to_GPU = False
+        
+        #if input_imgs is on the cpu even though there is a GPU, it means that the model is 
+        #on the GPU. Therefore, we need to send input_imgs on the GPU, applay the model to it and then 
+        #send it back to the cpu
+        if torch.cuda.is_available() and not input_imgs.is_cuda:
+            moved_to_GPU = True
+            input_imgs = input_imgs.cuda()
+            
         input_imgs_ = (input_imgs/255).float()
-        output = self.model.forward(input_imgs_)
+        output = self.model(input_imgs_)
 
         # output should be an int between [0,255]
-        output = torch.clip(output*255, 0, 255)
+        output.mul(255).clip(0, 255)
+        
+        if moved_to_GPU:
+            output = output.cpu()
+            
         return output
     
     def psnr(self, denoised, ground_truth):

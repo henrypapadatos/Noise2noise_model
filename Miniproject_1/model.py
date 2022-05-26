@@ -111,6 +111,10 @@ class Model():
         ## This loads the parameters saved in bestmodel .pth into the model$
         full_path = os.path.join('Miniproject_1', 'bestmodel.pth')
         self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
+        
+        if torch.cuda.is_available():
+            self.model.cuda()
+
 
     def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
         #: train˙input : tensor of size (N, C, H, W) containing a noisy version of the images
