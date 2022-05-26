@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import math
 from torch.nn.functional import fold
 from torch.nn.functional import unfold
+import pickle
 
 
 class Module ( object ) :
@@ -288,10 +289,21 @@ class Model():
                                 ,Sigmoid())
 
     def load_pretrained_model(self):
-        # This loads the parameters saved in bestmodel .pth into the model$
-        full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
-        self.model = torch.load(full_path,map_location=torch.device('cpu'))
-        pass 
+        # This loads the parameters saved in bestmodel .pkl into the model$
+        full_path = os.path.join('Miniproject_2', 'bestmodel.pkl')
+        
+        params = self.model.param()
+        
+        with open(full_path, 'rb') as file:          
+            loaded_params = pickle.load(file)
+        
+        for param_layer, loaded_param_layer in zip(params, loaded_params):
+            for param, loaded_param in zip(param_layer, loaded_param_layer):
+                # for param_el, loaded_param_el in zip(param, loaded_param):
+                
+                param[1].copy_(loaded_param[1])
+                param[0].copy_(loaded_param[0])
+    
     def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
         #num_epochs = 10
 
@@ -346,3 +358,11 @@ class Model():
         mse = torch.mean((denoised - ground_truth )** 2)
         psnr = -10 * torch . log10 ( mse + 10** -8)
         return psnr.item()
+    
+    def save_model(self):
+        
+        full_path = os.path.join('Miniproject_2', 'bestmodel.pkl')
+        params = self.model.param()
+        
+        with open(full_path, 'wb') as file:          
+            pickle.dump(params, file)

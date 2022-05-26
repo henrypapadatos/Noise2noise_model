@@ -7,7 +7,7 @@ from torch import nn
 from Miniproject_1 import model
 
 
-subset_train = 50000
+subset_train = 10000
 subset_test = 10000
 
 noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
@@ -20,14 +20,6 @@ test_imgs = test_imgs[0:subset_test,:,:,:]
 clean_imgs = clean_imgs[0:subset_test,:,:,:]
 
 noise2noise = model.Model()
-
-#If your computer is equiped with a GPU, the computation will happen there
-if torch.cuda.is_available():
-    noise2noise.model.cuda()
-    noisy_imgs_1 = noisy_imgs_1.cuda()
-    noisy_imgs_2 = noisy_imgs_2.cuda()
-    test_imgs = test_imgs.cuda()
-    clean_imgs = clean_imgs.cuda()
 
 noise2noise.train(noisy_imgs_1, noisy_imgs_2, num_epochs=100, test_input=test_imgs, test_target=clean_imgs, vizualisation_flag=True)    
     

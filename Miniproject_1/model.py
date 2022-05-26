@@ -117,6 +117,14 @@ class Model():
         #: train˙target : tensor of size (N, C, H, W) containing another noisy version of the
         # same images , which only differs from the input by their noise .
         
+        if torch.cuda.is_available():
+            self.model.cuda()
+            train_input = train_input.cuda()
+            train_target = train_target.cuda()
+            if test_input is not None: 
+                test_input = test_input.cuda()
+                test_target = test_target.cuda()
+        
         #If flag is true, plot the clean image and the noisy image
         if vizualisation_flag and test_input!=None:
             plt.ion()
@@ -155,12 +163,25 @@ class Model():
         #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network .
         
+        moved_to_GPU = False
+        
+        #if input_imgs is on the cpu even though there is a GPU, it means that the model is 
+        #on the GPU. Therefore, we need to send input_imgs on the GPU, applay the model to it and then 
+        #send it back to the cpu
+        if torch.cuda.is_available() and not input_imgs.is_cuda:
+            moved_to_GPU = True
+            input_imgs = input_imgs.cuda()
+        
         #normalize image between 0 and 1
         input_imgs_ = input_imgs/255
         output = self.model(input_imgs_)
         
         # output should be an int between [0,255]
         output = torch.clip(output*255, 0, 255)
+        
+        if moved_to_GPU:
+            output = output.cpu()
+        
         return output
     
     def psnr(self, denoised, ground_truth):

@@ -55,8 +55,8 @@ with torch.no_grad():
 # # y_torch.backward(gradient)
 # print(y-torch.gradient(y_torch))
 ################################################################ OUR DATASET ##########################################################
-subset_train = 10000
-subset_test = 100
+subset_train = 50000
+subset_test = 1000
 
 noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data.pkl')
 
@@ -142,7 +142,15 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
             
 ############################################################################################################################################
 
-model = model.Model()
+my_model = model.Model()
 
 # model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
-model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs, vizualisation_flag = True)
+my_model.train(noisy_imgs_1, noisy_imgs_2, num_epochs= 100, test_input=test_imgs,test_target=clean_imgs, vizualisation_flag = False)
+
+my_model.save_model()
+print("changing model")
+
+loaded_model = model.Model()
+loaded_model.load_pretrained_model()
+loaded_model.train(noisy_imgs_1, noisy_imgs_2, num_epochs= 20, test_input=test_imgs,test_target=clean_imgs, vizualisation_flag = False)
+
