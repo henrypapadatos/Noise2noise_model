@@ -1,12 +1,14 @@
 
 import os
 import torch
+from torch import empty
 import matplotlib.pyplot as plt
 import math
 from torch.nn.functional import fold
 from torch.nn.functional import unfold
 import pickle
 
+torch.set_default_dtype(torch.float64)
 
 class Module ( object ) :
     def forward ( self , x ) :
@@ -133,7 +135,7 @@ class Conv2d(Module):
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
     
 class Upsampling(Module):
-    def __init__(self, input_channel, output_channel, kernel_size, scale = 1, stride = 1, padding = 0, dilation= 1):
+    def __init__(self, input_channel= None, output_channel = None, kernel_size = None, scale = 1, stride = None, padding = None, dilation= None):
         ##add inpput and output param + other to be able to do convolution
         self.scale = scale
         self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
@@ -143,7 +145,7 @@ class Upsampling(Module):
     
     def forward (self , x) :
         
-        input_ = x.clone().float()
+        input_ = x.clone()
         [b,c_i,h_i,w_i] = input_.shape
         u1 = torch.empty(w_i,w_i*self.scale).fill_(0).nan_to_num_()
         u2 = torch.empty(h_i,h_i*self.scale).fill_(0).nan_to_num_()
@@ -158,22 +160,22 @@ class Upsampling(Module):
         for j in range(h_i):
             u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
         self.u2 = u2
-        u1_i = torch.matmul(input_,u1)
-        u1_i_t = torch.transpose(u1_i,2,3)
-        out = torch.matmul(u1_i_t,u2)
-        output = torch.transpose(out,2,3)
+        u1_i = input_.matmul(u1)
+        u1_i_t = u1_i.transpose(2,3)
+        out = u1_i_t.matmul(u2)
+        output = out.transpose(2,3)
         output = self.conv2d.forward(output)
         return output 
     
     def backward (self , y) :
-        y_ = y.clone().float()
+        y_ = y.clone()
         y_ = self.conv2d.backward(y_)
         v1 = self.u1.t()
         v2 = self.u2.t()
-        y_ = torch.transpose(y_,2,3)
-        v2_y = torch.matmul(y_,v2)
-        v2_y_t = torch.transpose(v2_y,2,3)
-        output2 = torch.matmul(v2_y_t,v1)
+        y_ = y_.transpose(2,3)
+        v2_y = y_.matmul(v2)
+        v2_y_t = v2_y.transpose(2,3)
+        output2 = v2_y_t.matmul(v1)
         return output2
 
     def param ( self ) :
@@ -303,7 +305,6 @@ class Model():
             plt.show()
             training_visualisation(test_target)
             training_visualisation(test_input)
-            
         
         if test_input!=None:
             initial_psnr = self.psnr(test_input/255, test_target/255)
@@ -360,7 +361,7 @@ class Model():
     def psnr(self, denoised, ground_truth):
         #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
         mse = torch.mean((denoised - ground_truth )** 2)
-        psnr = -10 * torch . log10 ( mse + 10** -8)
+        psnr = -10 * torch.log10 ( mse + 10** -8)
         return psnr.item()
     
     def save_model(self):

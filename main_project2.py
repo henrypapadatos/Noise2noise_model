@@ -7,7 +7,7 @@ import math
 from torch import empty
 from torch import set_grad_enabled
 import random
-#set_grad_enabled(False)
+set_grad_enabled(False)
 '''
 
 input_tensor = torch.normal(0, 1, size=(3,2,2), requires_grad=True)
@@ -67,6 +67,7 @@ test_imgs , clean_imgs = torch.load ('val_data.pkl')
 test_imgs = test_imgs[0:subset_test,:,:,:]
 clean_imgs = clean_imgs[0:subset_test,:,:,:]
 
+
 ################################################################ RANDOM DATASET FOR LINEAR #############################################
 
 # input_rand = torch.randn(10, 20)
@@ -107,32 +108,47 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
 #     psnr = -10 * torch . log10 ( mse + 10** -8)
 #     return psnr.item()
 
-# model = nn.Sequential(nn.Conv2d(3, 16, kernel_size=(3,3), stride=(1,1), padding=1),
+# model = nn.Sequential(nn.Conv2d(3, 32, kernel_size=(3,3), stride=2, padding=1),
 #                       nn.ReLU(),
-#                       nn.Conv2d(16, 16, kernel_size=(3,3), stride=(1,1), padding=1),
+#                       nn.Conv2d(32, 32, kernel_size=(3,3), stride=2, padding=1),
 #                       nn.ReLU(),
-#                       nn.Conv2d(16, 3, kernel_size=(3,3), stride=(1,1), padding=1),
+#                       #nn.Upsample(scale_factor= 2, mode = "nearest"),
+#                       nn.UpsamplingNearest2d(scale_factor = 2),
+#                       nn.Conv2d(32, 32, kernel_size=(3,3),padding=1),
+#                       nn.ReLU(),
+#                       nn.UpsamplingNearest2d(scale_factor = 2),
+#                       #nn.Upsample(scale_factor= 2, mode = "nearest")
+#                       nn.Conv2d(32, 3, kernel_size=(3,3),padding=1),
 #                       nn.Sigmoid()
 #                       )
 
-# lr = 0.001
+# lr = 1.0
 # batch_size=500
 # nb_epoch=100
 
 # optimizer = torch.optim.SGD(model.parameters(), lr)
 # criterion = nn.MSELoss()
-  
+
+# if test_imgs!=None:
+#             initial_psnr = psnr(test_imgs/255, clean_imgs/255)
+#             print('Psnr value between clean and noisy images is: {:.02f}'.format(initial_psnr))
+
 # for e in range(nb_epoch):
 #     for input, targets in zip(noisy_imgs_1.split(batch_size),  
 #                               noisy_imgs_2.split(batch_size)):
-#         output = model((input/255).float())
-#         loss = criterion(output/255, targets/255)
+#         model.train()
+#         output = model(input/255)
+#         loss = criterion(output, targets/255)
 #         optimizer.zero_grad()
 #         loss.backward()
 #         optimizer.step()
-        
-#     psnr=psnr(model(test_imgs), clean_imgs)
-#     print('Nb of epoch: {:d}    psnr: {:.02f}    loss: {:.08f}'.format(e, psnr, loss))
+    
+#     model.eval()
+#     output_ = test_imgs/255
+#     output_ = model(output_ )
+#     output_ = torch.clip(output_*255, 0, 255)
+#     psnr_=psnr(output_/255, clean_imgs/255)
+#     print('Nb of epoch: {:d}    psnr: {:.02f}    loss: {:.08f}'.format(e, psnr_, loss))
 
         
 
