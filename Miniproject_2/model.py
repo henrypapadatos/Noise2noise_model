@@ -1,4 +1,5 @@
 
+import os
 import torch
 from torch import empty
 import matplotlib.pyplot as plt
@@ -208,7 +209,7 @@ class Upsampling(Module):
     def __init__(self, input_channel= None, output_channel = None, kernel_size = None, scale = 1, stride = None, padding = None, dilation= None):
         ##add inpput and output param + other to be able to do convolution
         self.scale = scale
-        #self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
+        self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
 
     def forward (self , x) :
         
@@ -264,9 +265,9 @@ def training_visualisation(imgs):
     
 class Model():
     def __init__(self):
-        self.lr = 4.0 #0.001 best  0.00001
+        self.lr = 2.5 #0.001 best  0.00001
         self.nb_epoch = 100
-        self.batch_size = 500
+        self.batch_size = 40 #20
         #self.batch_size = 50
         self.optimizer = Optimizer(lr= self.lr)
         self.criterion = MSE()
@@ -279,17 +280,17 @@ class Model():
         # self.model = Sequential(Conv2d(input_channel = 3,output_channel = 16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,3,kernel_size = 3, padding = 1, stride = 1),Sigmoid())
         self.model = Sequential(Conv2d(input_channel = 3,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
                                 ,Relu()
-                                # ,Conv2d(input_channel = self.channel,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
-                                # ,Relu()
-                                # ,Upsampling(self.channel,self.channel,kernel_size = 3, scale= 2, padding = 1)
-                                # ,Relu()
+                                ,Conv2d(input_channel = self.channel,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
+                                ,Relu()
+                                ,Upsampling(self.channel,self.channel,kernel_size = 3, scale= 2, padding = 1)
+                                ,Relu()
                                 ,Upsampling(self.channel,3,kernel_size = 3, scale= 2, padding = 1)
                                 ,Sigmoid())
 
     def load_pretrained_model(self):
-        ## This loads the parameters saved in bestmodel .pth into the model$
-        #full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
-        #self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
+        # This loads the parameters saved in bestmodel .pth into the model$
+        full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
+        self.model = torch.load(full_path,map_location=torch.device('cpu'))
         pass 
     def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
         #num_epochs = 10
@@ -345,80 +346,3 @@ class Model():
         mse = torch.mean((denoised - ground_truth )** 2)
         psnr = -10 * torch . log10 ( mse + 10** -8)
         return psnr.item()
-
-class Linear(Module):
-    """ A Module implementing the sequential combination of several modules. It stores the individual modules in a list modules.
-    """
-    
-    def __init__(self,input_features,output_features,bias=True):
-        super(Linear).__init__()
-        
-        self.input_features = input_features
-        self.output_features = output_features
-        
-        self.weights = empty(input_features,output_features).nan_to_num()
-        self.weights_grad = empty(input_features,output_features).nan_to_num()
-        
-        if bias :
-            self.bias = empty(output_features).nan_to_num()
-            self.bias_grad = empty(output_features).nan_to_num()
-        else : 
-            self.bias = None
-            self.bias_grad = None
-        
-        self.reset()
-    
-    def reset(self):
-        """ Initializes the weights at random and the biases at 0 if they are defined
-        """
-        
-        std = 1. / math.sqrt(self.weights.size(0))
-        self.weights.normal_(-std,std)
-        self.weights_grad.fill_(0)
-        if self.bias is not None : 
-            self.bias.fill_(0)
-            self.bias_grad.fill_(0)
-    def forward(self,input):
-        """ Implements the forward pass for the Linear Module
-        Saves the input for the backward pass when we will need to compute gradients, under self.input  
-        Computes Y = X*w + b
-        """
-        self.input = input.clone()
-        if self.bias is not None:
-            return self.input.matmul(self.weights).add(self.bias)
-        else :
-            return self.input.matmul(self.weights)
-        
-    def backward(self,gradwrtoutput):
-        """ Implements the backward pass for the Linear Module
-        Uses the chain rule to compute the gradients wrt the weights, bias, and input and stores them in the instance parameters
-        Arguments:
-             #gradwrtoutput : dL/dy in the backprogation formulas 
-        """
-        
-        # Computes gradient wrt weights dw = X^(T) * dy using the backpropagation formulas
-        self.weights_grad = self.input.t().matmul(gradwrtoutput)
-        
-        # Computes gradient wrt bias iff bias is not none
-        # db = dy ^ (T) * 1  using the backpropagation formulas, 
-        # The sum is to take for account the possibility that we process our inputs by batches of size greater than 1, we sum the gradient contributions of independent points
-        if self.bias is not None : 
-                self.bias_grad = gradwrtoutput.t().sum(1)
-        
-
-        # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
-        return gradwrtoutput.matmul(self.weights.t())
-    
-    
-    def param(self):
-        """ Returns a list of pairs, each composed of a parameter tensor and its corresponding gradient tensor of same size
-        """
-        if self.bias is not None : 
-            return [(self.weights,self.weights_grad),(self.bias,self.bias_grad)]
-        else : 
-            return [(self.weights,self.weights_grad)]
-        
-        
-        
-    
-    

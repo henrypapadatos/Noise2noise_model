@@ -50,7 +50,7 @@ with torch.no_grad():
 
 # print(y-y_torch)
 
-# y = sequential.backward(y)
+# y = sequental.backward(y)
 
 # # y_torch.backward(gradient)
 # print(y-torch.gradient(y_torch))
@@ -158,7 +158,7 @@ for e in range(nb_epoch):
             
 ############################################################################################################################################
 
-#model = model.Model()
+model = model.Model()
 
 # model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
 #model.train(noisy_imgs_1, noisy_imgs_2, test_input=test_imgs,test_target=clean_imgs)
