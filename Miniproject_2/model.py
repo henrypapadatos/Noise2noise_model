@@ -1,12 +1,10 @@
 
 import torch
-from torch import nn
 from torch import empty
 import matplotlib.pyplot as plt
-import math
 from torch.nn.functional import fold
 from torch.nn.functional import unfold
-
+import math
 
 class Module ( object ) :
     def forward ( self , x ) :
@@ -114,15 +112,15 @@ class Conv2d(Module):
         self.weights.normal_(-std,std)
         
         '''
-        self.weight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0)
+        self.weight = empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0)
         k = math.sqrt(1/(input_channel*kernel_size[0]*kernel_size[1]))
         self.weight.uniform_(-k,k).nan_to_num_()
         #self.weight = self.weight.fill_(0).uniform_(-k,k)
-        self.bias = torch.empty(output_channel).fill_(0)
+        self.bias = empty(output_channel).fill_(0)
         self.bias.uniform_(-k,k).nan_to_num_()
         #self.bias = self.bias.fill_(0).uniform_(-k,k)
-        self.gradweight = torch.empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0).nan_to_num_()
-        self.gradbias = torch.empty(output_channel).fill_(0).nan_to_num_()
+        self.gradweight = empty(output_channel, input_channel,kernel_size[0],kernel_size[1]).fill_(0).nan_to_num_()
+        self.gradbias = empty(output_channel).fill_(0).nan_to_num_()
         
     def __call__(self, input):
         return self.forward(input)
@@ -134,12 +132,12 @@ class Conv2d(Module):
             weights = self.weight.clone()
             bias = self.bias.clone()
         elif bias==None:
-            bias= torch.empty(weights.size()[0]).fill_(0).nan_to_num()
+            bias= empty(weights.size()[0]).fill_(0).nan_to_num()
 
         h_in, w_in = x_.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
-        unfolded = torch.nn.functional.unfold(x_, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        unfolded = unfold(x_, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
         self.unfolded_x = unfolded.clone()
         out = unfolded.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2) + bias.view(1,-1,1)
         output = out.view(x_.shape[0], self.output_channel, int(h_out), int(w_out))
@@ -174,7 +172,7 @@ class Conv2d(Module):
         # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
         lin_w = self.weight.view(self.weight.size(0), -1)
         lin_grad_wrt_input = lin_w.transpose(0,1).matmul(lin_Y)
-        grad_wrt_input = torch.nn.functional.fold(lin_grad_wrt_input,output_size=(self.input.shape[-1],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        grad_wrt_input = fold(lin_grad_wrt_input,output_size=(self.input.shape[-1],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
         #print(" MAX grad_wrt_input", grad_wrt_input.abs().max())
 
         return grad_wrt_input
@@ -207,44 +205,44 @@ class Optimizer(Module):
         return self.params
 
 class Upsampling(Module):
-    def __init__(self, input_channel, output_channel, kernel_size, scale = 1, stride = 1, padding = 0, dilation= 1):
+    def __init__(self, input_channel= None, output_channel = None, kernel_size = None, scale = 1, stride = None, padding = None, dilation= None):
         ##add inpput and output param + other to be able to do convolution
         self.scale = scale
-        self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
+        #self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
 
     def forward (self , x) :
         
         input_ = x.clone().float()
         [b,c_i,h_i,w_i] = input_.shape
-        u1 = torch.empty(w_i,w_i*self.scale).fill_(0).nan_to_num_()
+        u1 = empty(w_i,w_i*self.scale).fill_(0).nan_to_num_()
         for i in range(w_i):
             u1[i,i*self.scale:(i*self.scale+self.scale)] = 1
         self.u1 = u1
-        u2 = torch.empty(h_i,h_i*self.scale).fill_(0).nan_to_num_()
+        u2 = empty(h_i,h_i*self.scale).fill_(0).nan_to_num_()
         for j in range(h_i):
             u2[j,j*self.scale:(j*self.scale+self.scale)] = 1
         self.u2 = u2
-        u1_i = torch.matmul(input_,u1)
-        u1_i_t = torch.transpose(u1_i,2,3)
-        out = torch.matmul(u1_i_t,u2)
-        output = torch.transpose(out,2,3)
-        output = self.conv2d.forward(output)
+        u1_i = input_.matmul(u1)
+        u1_i_t = u1_i.transpose(2,3)
+        out = u1_i_t.matmul(u2)
+        output = out.transpose(2,3)
+        #output = self.conv2d.forward(output)
         return output 
 
     
     def backward (self , y) :
         y_ = y.clone().float()
-        y_ = self.conv2d.backward(y_)
+        #y_ = self.conv2d.backward(y_)
         v1 = self.u1.t()
         v2 = self.u2.t()
-        y_ = torch.transpose(y_,2,3)
-        v2_y = torch.matmul(y_,v2)
-        v2_y_t = torch.transpose(v2_y,2,3)
-        output2 = torch.matmul(v2_y_t,v1)
-        return output2.div_(self.scale)
+        y_ = y_.transpose(2,3)
+        v2_y = y_.matmul(v2)
+        v2_y_t = v2_y.transpose(2,3)
+        output2 = v2_y_t.matmul(v1)
+        return output2
 
     def param ( self ) :
-        return self.conv2d.param()
+        return []#self.conv2d.param()
 
 
 def training_visualisation(imgs):
@@ -339,7 +337,7 @@ class Model():
         output = self.model.forward(input_imgs_)
 
         # output should be an int between [0,255]
-        output = torch.clip(output*255, 0, 255)
+        output = output.mul(255).clip(0, 255)
         return output
     
     def psnr(self, denoised, ground_truth):
