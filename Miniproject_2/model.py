@@ -59,7 +59,6 @@ class MSE(Module):
         self.prediction = x.clone()
         self.target = x_target.clone()
         return (self.prediction - self.target).pow(2).mean()
-        #return torch.rand(100,4,32,32)
     def backward (self) :
         return 2* (self.prediction-self.target)/self.prediction.numel()     
     def param ( self ) :
@@ -133,7 +132,8 @@ class Conv2d(Module):
     
     def param( self ) :
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
-    
+
+
 class Upsampling(Module):
     def __init__(self, input_channel, output_channel, kernel_size, scale = 1, stride = 1, padding = 0, dilation= 1):
         ##add inpput and output param + other to be able to do convolution
@@ -164,7 +164,7 @@ class Upsampling(Module):
         u1_i_t = u1_i.transpose(2,3)
         out = u1_i_t.matmul(u2)
         output = out.transpose(2,3)
-        output = self.conv2d.forward(output)
+        output = self.conv2d(output)
         return output 
     
     def backward (self , y) :
@@ -180,9 +180,7 @@ class Upsampling(Module):
 
     def param ( self ) :
         return self.conv2d.param()
-
-
-
+    
 class Optimizer(Module):
     def __init__(self, lr, momentum=0, dampening=0, weight_decay=0, nesterov=False, maximize=False):
         self.maximize = maximize
@@ -344,7 +342,7 @@ class Model():
         output = self.model(input_imgs_)
 
         # output should be an int between [0,255]
-        output.mul(255).clip(0, 255)
+        output = output.mul(255).clip(0, 255)
         
         if moved_to_GPU:
             output = output.cpu()

@@ -8,30 +8,28 @@ import torch
 import model
 import torch.nn.functional as F
 from torch import set_grad_enabled
+from torch import randn
+
 
 set_grad_enabled(True)
 x = torch.randn(1, 3, 32, 32)
 
-'''
+print('testing sigmiod forward')
 sigmoid = model.Sigmoid()
 print(torch.allclose(sigmoid.forward(x), torch.sigmoid(x)))
 
+# print('testing seqiential forward')
+# Sequential = model.Sequential
+# seq = Sequential(conv, sigmoid)
+# print(torch.allclose(seq.forward(x), F.conv2d(x, conv.weight, conv.bias).sigmoid()))
 
-
-unfolded = torch.nn.functional.unfold(x, kernel_size = 2, dilation = 2, padding = 0, stride = 1)
-print(unfolded.shape)
-
-Sequential = model.Sequential
-seq = Sequential(conv, sigmoid)
-print(torch.allclose(seq.forward(x), F.conv2d(x, conv.weight, conv.bias).sigmoid()))
-'''
+print('testing conv forward')
 Conv2d = model.Conv2d
 conv = Conv2d(3, 3, 3, padding=1, dilation =2, stride =2)
 print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias, padding=1, dilation =2, stride =2)))
 
 
 
-from torch import randn
 in_channels = 3
 out_channels = 7
 kernel_size = (2, 2)
@@ -42,7 +40,7 @@ torch.manual_seed(0)
 
 input = randn((1, in_channels, 7, 7), dtype=torch.double, requires_grad=True)
 
-
+print('testing conv backward')
 our_conv = Conv2d(in_channels, out_channels, kernel_size)
 weight = our_conv.weight
 bias = our_conv.bias
@@ -76,7 +74,7 @@ Conv2d = model.Conv2d
 conv = Conv2d(3, 3, 3, padding=1, dilation =2, stride =2)
 print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias, padding=1, dilation =2, stride =2)))
 
-print('Now testing MSE')
+print('Now testing MSE backward')
 from torch import randn
 in_channels = 3
 out_channels = 7
@@ -108,3 +106,12 @@ dl_dx = our_conv.backward()
 
 #check dl_dx
 print(torch.allclose(input.grad.float(), dl_dx))
+
+# print("Now test upsamplig")
+# Up = model.Upsampling
+# Up_torch = (3, 3, 3, padding=1, dilation =2, stride =2)
+# print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias, padding=1, dilation =2, stride =2)))
+
+
+
+
