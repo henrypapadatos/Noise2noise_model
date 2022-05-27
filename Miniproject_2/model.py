@@ -8,7 +8,7 @@ from torch.nn.functional import fold
 from torch.nn.functional import unfold
 import pickle
 
-# torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float64)
 
 class Module ( object ) :
     def forward ( self , x ) :
@@ -105,7 +105,7 @@ class Conv2d(Module):
         h_in, w_in = self.input.shape[2:]
         h_out = ((h_in+2*self.padding-self.dilation*(self.kernel_size[0]-1)-1)/self.stride+1)
         w_out = ((w_in+2*self.padding-self.dilation*(self.kernel_size[1]-1)-1)/self.stride+1)
-        unfolded = unfold(self.input, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        unfolded = unfold(self.input, kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride).double()
         self.unfolded_x = unfolded.clone()
         out = unfolded.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2) + bias.view(1,-1,1)
         output = out.view(self.input.shape[0], self.output_channel, int(h_out), int(w_out))
@@ -126,7 +126,7 @@ class Conv2d(Module):
         # Computes gradient wrt input X dX = dY * w^(T) using the backpropagation formulas
         lin_w = self.weight.view(self.weight.size(0), -1)
         lin_grad_wrt_input = lin_w.transpose(0,1).matmul(lin_Y)
-        grad_wrt_input = fold(lin_grad_wrt_input,output_size=(self.input.shape[-2],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride)
+        grad_wrt_input = fold(lin_grad_wrt_input,output_size=(self.input.shape[-2],self.input.shape[-1]), kernel_size = self.kernel_size, dilation = self.dilation, padding = self.padding, stride = self.stride).double()
 
         return grad_wrt_input
     

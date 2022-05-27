@@ -158,15 +158,15 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
             
 ############################################################################################################################################
 
-my_model = model.Model()
+# my_model = model.Model()
 
-# model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
-my_model.train(noisy_imgs_1, noisy_imgs_2, num_epochs=20, test_input=test_imgs,test_target=clean_imgs, vizualisation_flag = False)
+# # model.train(input_rand, target_rand, test_input=test_input_rand,test_target=test_target_rand)
+# my_model.train(noisy_imgs_1, noisy_imgs_2, num_epochs=20, test_input=test_imgs,test_target=clean_imgs, vizualisation_flag = False)
 
-my_model.save_model()
-print("changing model")
+# my_model.save_model()
+# print("changing model")
 
-# loaded_model = model.Model()
-# loaded_model.load_pretrained_model()
-# loaded_model.train(noisy_imgs_1, noisy_imgs_2, num_epochs= 5, test_input=test_imgs,test_target=clean_imgs, vizualisation_flag = False)
+loaded_model = model.Model()
+loaded_model.load_pretrained_model()
+loaded_model.train(noisy_imgs_1, noisy_imgs_2, num_epochs= 5, test_input=test_imgs,test_target=clean_imgs, vizualisation_flag = False)
 
