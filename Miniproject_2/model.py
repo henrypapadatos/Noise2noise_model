@@ -8,7 +8,7 @@ from torch.nn.functional import fold
 from torch.nn.functional import unfold
 import pickle
 
-torch.set_default_dtype(torch.float64)
+# torch.set_default_dtype(torch.float64)
 
 class Module ( object ) :
     def forward ( self , x ) :
@@ -135,7 +135,7 @@ class Conv2d(Module):
         return [(self.weight, self.gradweight), (self.bias, self.gradbias)]
     
 class Upsampling(Module):
-    def __init__(self, input_channel= None, output_channel = None, kernel_size = None, scale = 1, stride = None, padding = None, dilation= None):
+    def __init__(self, input_channel, output_channel, kernel_size, scale = 1, stride = 1, padding = 0, dilation= 1):
         ##add inpput and output param + other to be able to do convolution
         self.scale = scale
         self.conv2d = Conv2d(input_channel, output_channel, kernel_size, stride = stride, padding=padding, dilation=dilation)
@@ -255,16 +255,9 @@ class Model():
         self.lr = 2.5 #0.001 best  0.00001
         self.nb_epoch = 100
         self.batch_size = 40 #20
-        #self.batch_size = 50
         self.optimizer = Optimizer(lr= self.lr)
         self.criterion = MSE()
         self.channel = 32
-        ### LINEAR ##
-        #self.model = Sequential(Linear(20,25), Relu(), Linear(25,25),Relu(),Linear(25,20),Sigmoid())
-        #self.model = Sequential(Linear(2,25),Relu(),Linear(25,25),Relu(),Linear(25,25),Relu(),Linear(25,2),Sigmoid())
-
-        ### CONV2D ##
-        # self.model = Sequential(Conv2d(input_channel = 3,output_channel = 16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,16,kernel_size = 3, padding = 1, stride = 1),Relu(), Conv2d(16,3,kernel_size = 3, padding = 1, stride = 1),Sigmoid())
         self.model = Sequential(Conv2d(input_channel = 3,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
                                 ,Relu()
                                 ,Conv2d(input_channel = self.channel,output_channel = self.channel,kernel_size = 3, padding = 1, stride = 2)
@@ -276,7 +269,7 @@ class Model():
 
     def load_pretrained_model(self):
         # This loads the parameters saved in bestmodel .pkl into the model$
-        full_path = os.path.join('Miniproject_2', 'bestmodel.pkl')
+        full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
         
         params = self.model.param()
         

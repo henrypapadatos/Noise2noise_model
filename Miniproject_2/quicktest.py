@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*
 """
 Created on Sat May 21 18:49:25 2022
 
@@ -7,7 +7,9 @@ Created on Sat May 21 18:49:25 2022
 import torch
 import model
 import torch.nn.functional as F
+from torch import set_grad_enabled
 
+set_grad_enabled(True)
 x = torch.randn(1, 3, 32, 32)
 
 '''
@@ -27,7 +29,7 @@ Conv2d = model.Conv2d
 conv = Conv2d(3, 3, 3, padding=1, dilation =2, stride =2)
 print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias, padding=1, dilation =2, stride =2)))
 
-'''
+
 
 from torch import randn
 in_channels = 3
@@ -73,9 +75,8 @@ print(torch.allclose(input.grad.float(), dl_dx))
 Conv2d = model.Conv2d
 conv = Conv2d(3, 3, 3, padding=1, dilation =2, stride =2)
 print(torch.allclose(conv.forward(x), F.conv2d(x, conv.weight, conv.bias, padding=1, dilation =2, stride =2)))
-'''
 
-
+print('Now testing MSE')
 from torch import randn
 in_channels = 3
 out_channels = 7
