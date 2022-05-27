@@ -269,9 +269,13 @@ class Model():
         # This loads the parameters saved in bestmodel .pkl into the model$
         full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
         
+        file_abs_path = os.path.abspath(full_path)
+
+        #print("loading model 2! " + full_path)
+        
         params = self.model.param()
         
-        with open(full_path, 'rb') as file:          
+        with open(file_abs_path, 'rb') as file:          
             loaded_params = pickle.load(file)
         
         for param_layer, loaded_param_layer in zip(params, loaded_params):

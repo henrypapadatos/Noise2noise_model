@@ -129,5 +129,4 @@ dmypy.json
 .pyre/
 
 *.pkl
-*.pth
 .DS_Store
