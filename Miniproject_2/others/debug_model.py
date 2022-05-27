@@ -1,6 +1,8 @@
 
 import os
 import torch
+from torch import empty
+import matplotlib.pyplot as plt
 import math
 from torch.nn.functional import fold
 from torch.nn.functional import unfold
@@ -228,6 +230,23 @@ class Sequential(Module):  #MODIFY: supposed run sequentially all the stuff you 
             parameters.append(layer.param())
 
         return parameters
+
+def training_visualisation(imgs):
+    #Plot the 4 first images of imgs in a subplot way
+    fig=plt.figure()
+    nb_image = 4
+    for a in range(nb_image):
+        with torch.no_grad():     
+            b = imgs[a,:,:,:].int()
+            if torch.cuda.is_available():
+                b = b.to('cpu')
+            b = b.permute(1,2,0)    
+            ax = fig.add_subplot(1, nb_image, a+1)
+            subplot_title=("Image"+str(a))
+            ax.set_title(subplot_title)  
+            plt.imshow(b)
+    fig.tight_layout() 
+    plt.pause(0.001)
     
 class Model():
     def __init__(self):
@@ -248,13 +267,15 @@ class Model():
 
     def load_pretrained_model(self):
         # This loads the parameters saved in bestmodel .pkl into the model$
-        file_abs_path = os.path.dirname(os.path.abspath(__file__))
+        full_path = os.path.join('Miniproject_2', 'bestmodel.pth')
         
-        full_path = os.path.join(file_abs_path, 'bestmodel.pth')
+        file_abs_path = os.path.abspath(full_path)
+
+        #print("loading model 2! " + full_path)
         
         params = self.model.param()
         
-        with open(full_path, 'rb') as file:          
+        with open(file_abs_path, 'rb') as file:          
             loaded_params = pickle.load(file)
         
         for param_layer, loaded_param_layer in zip(params, loaded_params):
@@ -264,13 +285,26 @@ class Model():
                 param[1].copy_(loaded_param[1])
                 param[0].copy_(loaded_param[0])
     
-    def train(self, train_input, train_target, num_epochs=100):
+    def train(self, train_input, train_target, num_epochs=100 ,test_input=None, test_target=None, vizualisation_flag = False):
         #num_epochs = 10
         
         if torch.cuda.is_available():
             train_input = train_input.cuda()
             train_target = train_target.cuda()
-       
+            if test_input is not None: 
+                test_input = test_input.cuda()
+                test_target = test_target.cuda()
+
+        if vizualisation_flag and test_input!=None:
+            plt.ion()
+            plt.show()
+            training_visualisation(test_target)
+            training_visualisation(test_input)
+        
+        if test_input!=None:
+            initial_psnr = self.psnr(test_input/255, test_target/255)
+            print('Psnr value between clean and noisy images is: {:.02f}'.format(initial_psnr))
+
         for e in range(num_epochs):
             
             for input, targets in zip(train_input.split(self.batch_size),  
@@ -283,7 +317,16 @@ class Model():
                 self.model.backward(grad_loss)
                 self.optimizer.step(self.model.param())
 
-            print('Nb of epoch: {:d}   loss: {:.04f}'.format(e, loss))
+
+            if test_input!=None:
+                denoised = self.predict(test_input)    
+                psnr = self.psnr(denoised/255, test_target/255)                
+                print('Nb of epoch: {:d}    psnr: {:.04f}    loss: {:.08f}'.format(e, psnr, loss))
+                
+            #display denoised images 25 times during training
+            if vizualisation_flag and (e%(num_epochs//10)==0) and test_input!=None:
+                training_visualisation(denoised)
+            
         
     def predict(self, input_imgs):
         #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
@@ -299,7 +342,7 @@ class Model():
             moved_to_GPU = True
             input_imgs = input_imgs.cuda()
             
-        input_imgs_ = (input_imgs/255)
+        input_imgs_ = (input_imgs/255).float()
         output = self.model(input_imgs_)
 
         # output should be an int between [0,255]
@@ -309,6 +352,12 @@ class Model():
             output = output.cpu()
             
         return output
+    
+    def psnr(self, denoised, ground_truth):
+        #Peak Signal to Noise Ratio : denoised and ground˙truth have range [0 , 1]
+        mse = torch.mean((denoised - ground_truth )** 2)
+        psnr = -10 * torch.log10 ( mse + 10** -8)
+        return psnr.item()
     
     def save_model(self):
         

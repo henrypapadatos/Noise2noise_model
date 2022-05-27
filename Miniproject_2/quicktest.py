@@ -48,18 +48,18 @@ pytorch_conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size)
 pytorch_conv.weight = torch.nn.Parameter(weight)
 pytorch_conv.bias = torch.nn.Parameter(bias)
 
-our_y_pred = our_conv.forward(input.float())
-pytorch_conv = pytorch_conv.float()
-pytorch_y_pred = pytorch_conv(input.float())
+our_y_pred = our_conv.forward(input)
+pytorch_conv = pytorch_conv
+pytorch_y_pred = pytorch_conv(input)
 pytorch_y_pred.retain_grad()
 
 print(torch.allclose(our_y_pred, pytorch_y_pred)) #test forward
 
 gradient = torch.rand_like(our_y_pred)
 
-pytorch_y_pred.backward(gradient=gradient.float())
+pytorch_y_pred.backward(gradient=gradient)
 
-dl_dx = our_conv.backward(gradient.float())
+dl_dx = our_conv.backward(gradient)
 
 #check weight
 print(torch.allclose(pytorch_conv.weight.grad, our_conv.gradweight))
@@ -68,7 +68,7 @@ print(torch.allclose(pytorch_conv.weight.grad, our_conv.gradweight))
 print(torch.allclose(pytorch_conv.bias.grad, our_conv.gradbias))
 
 #check dl_dx
-print(torch.allclose(input.grad.float(), dl_dx))
+print(torch.allclose(input.grad, dl_dx))
 
 Conv2d = model.Conv2d
 conv = Conv2d(3, 3, 3, padding=1, dilation =2, stride =2)

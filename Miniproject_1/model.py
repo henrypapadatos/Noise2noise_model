@@ -108,10 +108,12 @@ class Model():
 
     def load_pretrained_model(self):
         ## This loads the parameters saved in bestmodel .pth into the model$
-        full_path = os.path.join('Miniproject_1', 'bestmodel.pth')
-        file_abs_path = os.path.abspath(full_path)
-
-        self.model.load_state_dict(torch.load(file_abs_path,map_location=torch.device('cpu')))
+        
+        file_abs_path = os.path.dirname(os.path.abspath(__file__))
+        
+        full_path = os.path.join(file_abs_path, 'bestmodel.pth')
+        
+        self.model.load_state_dict(torch.load(full_path,map_location=torch.device('cpu')))
         
         if torch.cuda.is_available():
             self.model.cuda()

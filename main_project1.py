@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import sys
-sys.path.append(r'C:\Users\papad\OneDrive\Documents\MA2\Deep_learning\Project\Noise2noise_model\Miniproject_1\others')
 import torch
 from Miniproject_1 import model
 
