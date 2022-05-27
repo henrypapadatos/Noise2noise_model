@@ -25,13 +25,13 @@ clean_imgs = clean_imgs[0:subset_test,:,:,:]
 
 
 
-# noise2noise = model.Model()
+noise2noise = model.Model()
 
-# noise2noise.train(noisy_imgs_1, noisy_imgs_2, num_epochs=10)   
+noise2noise.train(noisy_imgs_1, noisy_imgs_2, num_epochs=10)   
 
-# denoised = noise2noise.predict(test_imgs)
-# psnr_ = psnr(denoised/255, clean_imgs/255) 
-# print("Psnr for trained model is: "+str(psnr_))
+denoised = noise2noise.predict(test_imgs)
+psnr_ = psnr(denoised/255, clean_imgs/255) 
+print("Psnr for trained model is: "+str(psnr_))
 
 loaded_model =  model.Model()
 loaded_model.load_pretrained_model()
