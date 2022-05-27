@@ -1,4 +1,3 @@
-
 import os
 import torch
 from torch import empty
@@ -8,6 +7,11 @@ from torch.nn.functional import fold
 from torch.nn.functional import unfold
 import pickle
 
+'''
+ATTENTION: 
+
+ To be able to run this code val_data.pkl, train_data.pkl and bestmodel.pth must be next to this code file (same directory path)
+'''
 torch.set_default_dtype(torch.float64)
 
 class Module ( object ) :
