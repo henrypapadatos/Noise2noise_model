@@ -215,8 +215,6 @@ class Model():
                      input_imgs : tensor of size (N1 , C, H, W) that has to be denoised by the trained
                      or the loaded network.
         """
-        #: test˙input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
-        # or the loaded network .
         
         moved_to_GPU = False
         
